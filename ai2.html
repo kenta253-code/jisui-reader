@@ -513,7 +513,7 @@
                         </button>
                     </div>
 
-                    <div class="ai-result-box" id="aiQueryResult">質問を入力してクルマの「AIに質問する」を押すと、指定した範囲の本文をもとにAIが直接回答します。</div>
+                    <div class="ai-result-box" id="aiQueryResult">質問を入力して「AIに質問する」を押すと、指定した範囲の本文をもとにAIが直接回答します。</div>
                 </div>
             </div>
         </div>
@@ -1151,19 +1151,34 @@
         return cleaned || text;
     }
 
-    // 公式推奨の直指定モデル（gemini-1.5-flash）による最も安定した通信方式
+    // 【根本的修正】Google公式推奨の最新 Interactions API 形式（v1beta/interactions）に完全移行
     async function callGeminiVision(parts) {
-        const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$){GEMINI_API_KEY}`, {
+        const payload = {
+            model: "gemini-3.7-flash",
+            input: [
+                {
+                    role: "user",
+                    parts: [
+                        { text: "あなたは小説読書アシスタントです。添付された本文ページ画像をもとに、読者の質問に分かりやすく日本語で直接回答してください。思考プロセスや英語のメタメモは一切含めず、日本語の回答本文のみを出力してください。" },
+                        ...parts
+                    ]
+                }
+            ]
+        };
+
+        const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/interactions](https://generativelanguage.googleapis.com/v1beta/interactions)`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'x-goog-api-key': GEMINI_API_KEY
             },
-            body: JSON.stringify({ contents: [{ parts }] })
+            body: JSON.stringify(payload)
         });
 
         if (res.ok) {
             const data = await res.json();
-            const result = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            // Interactions API の標準出力フィールドから回答テキストを取得
+            const result = data.output_text || data.candidates?.[0]?.content?.parts?.[0]?.text;
             if (result) return result;
         } else {
             const errData = await res.json().catch(() => ({}));
@@ -1198,19 +1213,10 @@
 
             const bookTitle = currentBook.title || '書籍';
 
-            const promptText = `あなたは小説読書アシスタントです。
-作品名：『${bookTitle}』
-探索範囲：P.${startPage} 〜 P.${currentPage}
-読者の質問・指示：
-「${queryText}」
+            // 質問内容をパーツ配列のテキストとして追加
+            const queryPrompt = `作品名：『${bookTitle}』\n探索範囲：P.${startPage} 〜 P.${currentPage}\n読者の質問：${queryText}`;
+            const parts = [{ text: queryPrompt }, ...imageParts];
 
-添付された本文画像（P.${startPage}〜P.${currentPage}の抜粋）をもとに、読者の質問に直接、分かりやすく日本語で回答してください。
-
-【厳格な指示】
-1. P.${currentPage}より先の展開（ネタバレ）は絶対に含めないでください。
-2. 思考プロセス、英語の要約、メタ確認メモは一切書かず、読者の質問に対する【自然な日本語の回答本文のみ】を出力してください。`;
-
-            const parts = [{ text: promptText }, ...imageParts];
             const rawResult = await callGeminiVision(parts);
             
             const resultText = `【回答】\n\n` + cleanAnswerText(rawResult);

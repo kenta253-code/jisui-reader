@@ -1107,8 +1107,8 @@
             aiSummaryResult.textContent = currentBook.aiSummaries[key];
         } else {
             aiSummaryResult.textContent = activeSummaryRange === 'recent' 
-                ? '「エピソードを抽出」を押すと、直前のしおり位置から現在までの出来事を箇条書きで整理します。'
-                : '「エピソードを抽出」を押すと、冒頭から現在までの主な出来事を箇条書きで整理します。';
+                ? '「エピソードを抽出」を押すと、直前のしおり位置から現在までの出来事を整理して表示します。'
+                : '「エピソードを抽出」を押すと、冒頭から現在までの主な出来事を整理して表示します。';
         }
     }
 
@@ -1150,44 +1150,93 @@
         return imageParts;
     }
 
-    function cleanAIResponse(rawText, fallbackPrefix = "") {
+    // エピソード抽出の安全な整形処理（表題＋解説を1回分のみ抽出）
+    function cleanEpisodeResponse(rawText, headerPrefix) {
         if (!rawText) return "解析結果を取得できませんでした。";
 
-        const lines = rawText.split('\n');
-        const japaneseLines = [];
+        let text = rawText.replace(/\*\*/g, '').trim();
+        const lines = text.split('\n');
+        const formattedBlocks = [];
+        let curBlock = [];
+        let count = 0;
+        const seenTitles = new Set();
 
-        for (const line of lines) {
-            let trimmed = line.trim();
-            if (!trimmed) continue;
-            
-            if (/^(Constraint|Image|Draft|Context|Characters|Key Plot|Refinement|Title|Content|Length|No spoilers|Final Version|\*)/i.test(trimmed)) {
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+
+            if (/^(Constraint|Image|Draft|Context|Characters|Key Plot|Refinement|Title|Content|Length|No spoilers|Final Version|Okay|\*|```)/i.test(line)) {
                 continue;
             }
 
-            if (/^[・\-\s\.\…\(\)（）出来事\d]+$/.test(trimmed)) {
-                continue;
+            const m = line.match(/^(\d+)[\.\s、\)]\s*(.+)$/);
+            if (m) {
+                let title = m[2].replace(/\([A-Za-z0-9\s"'\.,\-_–—]+\)/g, '').trim();
+                const jpCount = (title.match(/[\u3040-\u309F\u4E00-\u9FAF]/g) || []).length;
+
+                if (jpCount >= 2 && !/^(Cover|P\.\d+|Image)/i.test(title)) {
+                    if (seenTitles.has(title.substring(0, 8))) break; // 重複ブロック防止
+
+                    if (curBlock.length > 0) {
+                        formattedBlocks.push(curBlock.join('\n\n'));
+                        curBlock = [];
+                    }
+
+                    count++;
+                    seenTitles.add(title.substring(0, 8));
+                    curBlock.push(`${count}. ${title}`);
+                    continue;
+                }
             }
 
-            const jpMatch = trimmed.match(/[\u3040-\u309F\u4E00-\u9FAF]/g);
-            if (jpMatch && jpMatch.length >= 4) {
-                if (/^【.*】$/.test(trimmed)) continue;
-
-                trimmed = trimmed.replace(/^[\*\-\d\.\s]+/, '').trim();
-                if (trimmed && !trimmed.includes('出来事1') && !trimmed.includes('出来事2')) {
-                    japaneseLines.push(trimmed.startsWith('・') ? trimmed : '・' + trimmed);
+            if (count > 0) {
+                const jpCount = (line.match(/[\u3040-\u309F\u4E00-\u9FAF]/g) || []).length;
+                if (jpCount >= 4 && !/^\d+[\.\s]/.test(line)) {
+                    curBlock.push(line);
                 }
             }
         }
 
-        const limitedLines = japaneseLines.slice(0, 8);
-
-        if (limitedLines.length > 0) {
-            return (fallbackPrefix ? fallbackPrefix + "\n" : "") + limitedLines.join('\n');
+        if (curBlock.length > 0) {
+            formattedBlocks.push(curBlock.join('\n\n'));
         }
 
-        return rawText.trim();
+        if (formattedBlocks.length > 0) {
+            return headerPrefix + '\n\n' + formattedBlocks.join('\n\n');
+        }
+
+        return headerPrefix + '\n\n' + text;
     }
 
+    // 人物解説の安全な整形処理（重複・多段落出力を1つに厳選）
+    function cleanCharacterResponse(rawText, headerPrefix) {
+        if (!rawText) return "解説を取得できませんでした。";
+
+        let text = rawText.replace(/\*\*/g, '').trim();
+        const paragraphs = text.split(/\n\s*\n|\n/);
+        const validParagraphs = [];
+
+        for (const p of paragraphs) {
+            let line = p.trim().replace(/^[\*\-\・\s]+/, '');
+            if (!line) continue;
+            if (/^(Constraint|Image|Draft|Context|Characters|Key Plot|Refinement|Title|Content|Length|No spoilers|Final Version|Okay|\*|```)/i.test(line)) {
+                continue;
+            }
+            const jpCount = (line.match(/[\u3040-\u309F\u4E00-\u9FAF]/g) || []).length;
+            if (jpCount >= 10 && !line.startsWith('【')) {
+                validParagraphs.push(line);
+            }
+        }
+
+        if (validParagraphs.length > 0) {
+            // 最もまとまっている最初の段落を採用
+            return headerPrefix + '\n\n' + validParagraphs[0];
+        }
+
+        return headerPrefix + '\n\n' + text;
+    }
+
+    // 動的モデル検出による安定通信
     async function callGeminiVision(parts) {
         const mRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`);
         const mData = await mRes.json();
@@ -1239,17 +1288,24 @@
             const imageParts = await extractPageImagesForAI(startPage, currentPage, 6);
             if (imageParts.length === 0) throw new Error("ページの読み込みに失敗しました。");
 
-            const promptText = `添付された本文ページ画像（P.${startPage}〜P.${currentPage}）を読み取り、この範囲で起きた主要な出来事・エピソードを、重要度に応じて【5つ〜最大8個程度】の箇条書き（行頭に・を付ける）で出力してください。
+            const promptText = `添付された本文ページ画像（P.${startPage}〜P.${currentPage}）を読み取り、この範囲の中で起きた「重要で象徴的なエピソード」を時系列順に【日本語の表題をつけて最大5〜8個】提示してください。
+
+【出力形式】
+1. 表題（見出し）
+出来事の具体的な経緯、登場人物の行動や心理、起きた結果を説明した2〜3行の日本語の解説文。
+
+2. 表題（見出し）
+解説文。
 
 【厳格な指示】
-1. 本文に書かれている具体的な人物名や起きた事実・行動を明確に記述してください。
-2. 8個を超える長すぎる出力は避け、重要な出来事に絞り込んでください。
-3. ネタバレは一切書かないでください。
-4. 英語の思考メモや挨拶は含めず、日本語の箇条書きのみを出力してください。`;
+1. 英語の思考メモ、英語の要約、英語の見出し、英語の翻訳（括弧内の英語）は一切出力しないでください。
+2. 表題・解説ともに【純粋な日本語のみ】で出力してください。
+3. 同じ文章やエピソードを繰り返して出力しないでください。
+4. ネタバレは一切書かないでください。`;
 
             const parts = [{ text: promptText }, ...imageParts];
             const rawResult = await callGeminiVision(parts);
-            const resultText = cleanAIResponse(rawResult, `【P.${startPage}〜P.${currentPage} の主要エピソード】`);
+            const resultText = cleanEpisodeResponse(rawResult, `【P.${startPage}〜P.${currentPage} の主要エピソード】`);
 
             const key = getSummaryKey();
             if (!currentBook.aiSummaries) currentBook.aiSummaries = {};
@@ -1291,14 +1347,14 @@
 添付された本文画像（P.1〜P.${currentPage}の抜粋）および作品設定をもとに、「${charName}」について解説してください。
 
 【厳格な指示】
-1. P.${currentPage}までの範囲で作中に登場・言及されている「立場・職業・身分」「主人公との関係性」「どのような人物か」を2〜4行程度の自然な日本語で簡潔に解説してください。
+1. P.${currentPage}までの範囲で作中に登場・言及されている「立場・職業・身分」「主人公との関係性」「どのような人物か」を2〜3行程度の自然な日本語で簡潔に1段落で解説してください。
 2. もし画像内に直接の記述が少ない場合でも、「画像に見当たらない」等のメタ発言は絶対に書かず、作品のジャンル・時代背景・文脈から推測される役割を自然に説明してください。
 3. ネタバレは一切書かないでください。
-4. 英語の思考メモは含めず、日本語の解説文のみを出力してください。`;
+4. 英語の思考メモや同じ文章の繰り返しは含めず、日本語の解説文のみを1回だけ出力してください。`;
 
             const parts = [{ text: promptText }, ...imageParts];
             const rawResult = await callGeminiVision(parts);
-            const resultText = cleanAIResponse(rawResult, `【${charName} について】`);
+            const resultText = cleanCharacterResponse(rawResult, `【${charName} について】`);
 
             if (!currentBook.aiCharacters) currentBook.aiCharacters = {};
             currentBook.aiCharacters[cacheKey] = resultText;

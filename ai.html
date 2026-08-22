@@ -1150,18 +1150,33 @@
         return imageParts;
     }
 
+    // 英語思考メモを確実に切り落とし、日本語の「1. ○○」から抽出する関数
     function cleanAIResponse(rawText, fallbackPrefix = "") {
         if (!rawText) return "解析結果を取得できませんでした。";
 
         let text = rawText.trim();
-        // 英語の思考メモやメタデータ行を除去
-        text = text.replace(/^(Constraint|Image|Draft|Context|Characters|Key Plot|Refinement|Title|Content|Length|No spoilers|Final Version|\*).*\n?/gim, '');
-        text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
 
-        // 不要な前置きを省き、最初の数字見出し（1. や 1 など）から開始
-        const firstNumIndex = text.search(/1[\.\s、]/);
-        if (firstNumIndex > 0) {
-            text = text.substring(firstNumIndex);
+        // 英語の思考・メモ・下書きを完全に排除するため、
+        // 「1. 」または「1、」「1 」に続いて日本語（漢字・ひらがな・カタカナ）が始まる位置を探索
+        const match = text.match(/(?:^|\n)(?:1[\.\s、\)]\s*[\u3040-\u309F\u4E00-\u9FAF])/);
+        if (match && match.index !== undefined) {
+            text = text.substring(match.index).trim();
+        } else {
+            // 見つからない場合は行単位で英語行を除外
+            const lines = text.split('\n');
+            const validLines = [];
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed) continue;
+                if (/^(Constraint|Image|Draft|Context|Characters|Key Plot|Refinement|Title|Content|Length|No spoilers|Final Version|Okay|\*)/i.test(trimmed)) {
+                    continue;
+                }
+                const jpMatch = trimmed.match(/[\u3040-\u309F\u4E00-\u9FAF]/g);
+                if (jpMatch && jpMatch.length >= 3) {
+                    validLines.push(trimmed);
+                }
+            }
+            text = validLines.join('\n\n');
         }
 
         if (fallbackPrefix) {
@@ -1202,7 +1217,7 @@
         throw new Error('利用可能なGeminiモデルでの解析に失敗しました。');
     }
 
-    // 表題＋状況解説形式のエピソード抽出アクション
+    // エピソード抽出アクション
     window.generateSummaryAction = async function() {
         if (!pdfDoc || !currentBook) return;
 
@@ -1221,19 +1236,13 @@
             const imageParts = await extractPageImagesForAI(startPage, currentPage, 6);
             if (imageParts.length === 0) throw new Error("ページの読み込みに失敗しました。");
 
-            const promptText = `あなたは小説読書アシスタントです。添付された本文ページ画像（P.${startPage}〜P.${currentPage}）を読み取り、この範囲の中で起きた「重要で象徴的なエピソード」を時系列順に【それぞれ表題をつけて最大5〜8個】にまとめて提示してください。
-
-【出力フォーマット】
-1. （エピソードの表題・見出し）
-（その出来事・登場人物の行動や心理・起きた結果を具体的に説明した2〜3行の日本語の解説文）
-
-2. （エピソードの表題・見出し）
-（解説文）
+            const promptText = `あなたは小説読書アシスタントです。添付された本文ページ画像（P.${startPage}〜P.${currentPage}）を読み取り、この範囲で起きた「重要で象徴的なエピソード」を時系列順に【それぞれ表題をつけて最大5〜8個】にまとめて提示してください。
 
 【厳格な指示】
-1. 抽象的な要約ではなく、具体的な人物名や起きた事実・事件の経緯がわかるように記述してください。
-2. P.${currentPage}より先の展開（ネタバレ）は絶対に含めないでください。
-3. 英語の思考メモや挨拶は一切含めず、上記の番号付きエピソード本文のみを出力してください。`;
+1. 各エピソードは「番号. 表題」の次の行に「2〜3行の具体的な経緯・人物の行動や心理・起きた結果の解説文」を書く構成にしてください。
+2. 抽象的な要約ではなく、具体的な人物名や起きた事実・事件の経緯がわかるように記述してください。
+3. P.${currentPage}より先の展開（ネタバレ）は絶対に含めないでください。
+4. 英語の思考プロセスや下書き、挨拶は一切出力せず、「1. 」から始まる日本語本文のみを出力してください。`;
 
             const parts = [{ text: promptText }, ...imageParts];
             const rawResult = await callGeminiVision(parts);

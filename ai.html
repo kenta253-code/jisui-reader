@@ -1160,25 +1160,21 @@
             let trimmed = line.trim();
             if (!trimmed) continue;
             
-            // 英語の見出しやメタデータ行を除外
             if (/^(Constraint|Image|Draft|Context|Characters|Key Plot|Refinement|Title|Content|Length|No spoilers|Final Version|\*)/i.test(trimmed)) {
                 continue;
             }
 
-            // 省略記号だけの行を排除
-            if (/^[・\-\s\.\…]+$/.test(trimmed)) {
+            // 省略記号やプレースホルダー行（出来事1など）を排除
+            if (/^[・\-\s\.\…\(\)（）出来事\d]+$/.test(trimmed)) {
                 continue;
             }
 
-            // ひらがな・漢字を含む実質的な日本語行のみ抽出
             const jpMatch = trimmed.match(/[\u3040-\u309F\u4E00-\u9FAF]/g);
-            if (jpMatch && jpMatch.length >= 3) {
-                // 【】で囲まれたタイトル行は除外
+            if (jpMatch && jpMatch.length >= 4) {
                 if (/^【.*】$/.test(trimmed)) continue;
 
-                // 先頭の箇条書き記号を統一
                 trimmed = trimmed.replace(/^[\*\-\d\.\s]+/, '').trim();
-                if (trimmed) {
+                if (trimmed && !trimmed.includes('出来事1') && !trimmed.includes('出来事2')) {
                     japaneseLines.push(trimmed.startsWith('・') ? trimmed : '・' + trimmed);
                 }
             }
@@ -1242,12 +1238,12 @@
             const imageParts = await extractPageImagesForAI(startPage, currentPage, 6);
             if (imageParts.length === 0) throw new Error("ページの読み込みに失敗しました。");
 
-            const promptText = `あなたは小説読書アシスタントです。添付された本文ページ画像（P.${startPage}〜P.${currentPage}）を読み取り、この範囲で実際に起きている「主要な出来事・エピソード」を具体的に3〜4行の日本語の箇条書き（行頭に・を付ける）で出力してください。
+            const promptText = `添付された本文ページ画像（P.${startPage}〜P.${currentPage}）を読み取り、この範囲で実際に起きている出来事や登場人物の行動を、具体的に3〜4行の日本語の箇条書き（・から始まる行）で出力してください。
 
 【厳格な指示】
-1. 「...」や省略記号は絶対に使わず、具体的な人物名や起きた行動・事実を書いてください。
-2. P.${currentPage}より先の展開（ネタバレ）は絶対に含めないでください。
-3. 英語の思考プロセスや挨拶は一切出力せず、日本語の箇条書き本文のみを出力してください。`;
+1. 「（出来事1）」「...」などのプレースホルダーや省略記号は絶対に使わず、本文に書かれている具体的な人名や起きた事実を文章にしてください。
+2. ネタバレは一切書かないでください。
+3. 英語の思考メモは含めず、日本語の箇条書きのみを出力してください。`;
 
             const parts = [{ text: promptText }, ...imageParts];
             const rawResult = await callGeminiVision(parts);
@@ -1278,10 +1274,6 @@
 
         const currentPage = pageNum;
         const cacheKey = `${charName}_p${currentPage}`;
-        if (currentBook.aiCharacters && currentBook.aiCharacters[cacheKey]) {
-            aiCharacterResult.textContent = currentBook.aiCharacters[cacheKey];
-            return;
-        }
 
         aiCharacterResult.textContent = `P.1〜P.${currentPage} を探索して「${charName}」の情報を整理中... ⏳`;
 

@@ -1151,40 +1151,55 @@
         return cleaned || text;
     }
 
-    // 【根本的修正】Google公式推奨の最新 Interactions API 形式（v1beta/interactions）に完全移行
+    // 安定稼働する動的モデル探索通信（エラーが起きた場合に別の最新モデルへ自動切り替え）
     async function callGeminiVision(parts) {
-        const payload = {
-            model: "gemini-3.7-flash",
-            input: [
-                {
-                    role: "user",
-                    parts: [
-                        { text: "あなたは小説読書アシスタントです。添付された本文ページ画像をもとに、読者の質問に分かりやすく日本語で直接回答してください。思考プロセスや英語のメタメモは一切含めず、日本語の回答本文のみを出力してください。" },
-                        ...parts
-                    ]
+        let candidateModels = [];
+
+        try {
+            const mRes = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models?key=$](https://generativelanguage.googleapis.com/v1beta/models?key=$){GEMINI_API_KEY}`);
+            if (mRes.ok) {
+                const mData = await mRes.json();
+                if (mData && mData.models) {
+                    candidateModels = mData.models.filter(m => 
+                        m.supportedGenerationMethods && 
+                        m.supportedGenerationMethods.includes('generateContent') && 
+                        !m.name.includes('embedding')
+                    );
                 }
-            ]
-        };
+            }
+        } catch (e) {}
 
-        const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/interactions](https://generativelanguage.googleapis.com/v1beta/interactions)`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-goog-api-key': GEMINI_API_KEY
-            },
-            body: JSON.stringify(payload)
-        });
-
-        if (res.ok) {
-            const data = await res.json();
-            // Interactions API の標準出力フィールドから回答テキストを取得
-            const result = data.output_text || data.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (result) return result;
-        } else {
-            const errData = await res.json().catch(() => ({}));
-            throw new Error(errData.error?.message || `HTTP ${res.status}`);
+        if (candidateModels.length === 0) {
+            candidateModels = [
+                { name: 'models/gemini-1.5-flash' },
+                { name: 'models/gemini-2.5-flash' },
+                { name: 'models/gemini-1.5-pro' }
+            ];
         }
-        throw new Error('AIからの応答を取得できませんでした。');
+
+        let lastErrMsg = '';
+        for (const model of candidateModels) {
+            try {
+                const endpointName = model.name.startsWith('models/') ? model.name : `models/${model.name}`;
+                const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/$](https://generativelanguage.googleapis.com/v1beta/$){endpointName}:generateContent?key=${GEMINI_API_KEY}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts }] })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    const result = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (result) return result;
+                } else {
+                    const errData = await res.json().catch(() => ({}));
+                    lastErrMsg = errData.error?.message || `HTTP ${res.status}`;
+                }
+            } catch(e) {
+                lastErrMsg = e.message || 'ネットワーク接続エラー';
+            }
+        }
+        throw new Error(`AI解析エラー (${lastErrMsg})`);
     }
 
     // フリー質問送信アクション
@@ -1213,10 +1228,19 @@
 
             const bookTitle = currentBook.title || '書籍';
 
-            // 質問内容をパーツ配列のテキストとして追加
-            const queryPrompt = `作品名：『${bookTitle}』\n探索範囲：P.${startPage} 〜 P.${currentPage}\n読者の質問：${queryText}`;
-            const parts = [{ text: queryPrompt }, ...imageParts];
+            const promptText = `あなたは小説読書アシスタントです。
+作品名：『${bookTitle}』
+探索範囲：P.${startPage} 〜 P.${currentPage}
+読者の質問・指示：
+「${queryText}」
 
+添付された本文画像（P.${startPage}〜P.${currentPage}の抜粋）をもとに、読者の質問に直接、分かりやすく日本語で回答してください。
+
+【厳格な指示】
+1. P.${currentPage}より先の展開（ネタバレ）は絶対に含めないでください。
+2. 思考プロセス、英語の要約、メタ確認メモは一切書かず、読者の質問に対する【自然な日本語の回答本文のみ】を出力してください。`;
+
+            const parts = [{ text: promptText }, ...imageParts];
             const rawResult = await callGeminiVision(parts);
             
             const resultText = `【回答】\n\n` + cleanAnswerText(rawResult);

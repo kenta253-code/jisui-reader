@@ -516,10 +516,10 @@
                         <span>👥 「この人誰だっけ？」人物メモ</span>
                     </div>
                     <div style="display: flex; gap: 6px;">
-                        <input type="text" id="aiCharacterInput" placeholder="人物名（例: 湯川, 官兵衛）" style="flex: 1; font-size: 12px; padding: 6px 8px;">
+                        <input type="text" id="aiCharacterInput" placeholder="人物名（例: 板倉勝静, 官兵衛）" style="flex: 1; font-size: 12px; padding: 6px 8px;">
                         <button class="btn btn-primary" style="font-size: 12px;" onclick="queryCharacterAction()">解説</button>
                     </div>
-                    <div class="ai-result-box" id="aiCharacterResult">人物名を入力して「解説」を押すと、現在読んでいるページまでの範囲で初登場シーンや主人公との関係性を簡潔に教えます。</div>
+                    <div class="ai-result-box" id="aiCharacterResult">人物名を入力して「解説」を押すと、作中での立場や主人公との関係性を簡潔に教えます。</div>
                 </div>
             </div>
         </div>
@@ -1100,6 +1100,7 @@
         }
     }
 
+    // 冒頭から現在ページまでを広くサンプリングする画像抽出
     async function extractPageImagesForAI(startPage, endPage, maxSamplePages = 8) {
         const actualStart = (startPage === 1 && endPage > 1) ? 2 : startPage;
         const total = endPage - actualStart + 1;
@@ -1138,17 +1139,14 @@
         return imageParts;
     }
 
-    // 英語の思考文を取り除き、純粋な日本語要約のみを抽出する関数
     function cleanAIResponse(rawText, fallbackPrefix = "") {
         if (!rawText) return "解析結果を取得できませんでした。";
 
-        // JSONブロックがある場合
         const jsonMatch = rawText.match(/\{[\s\S]*"summary"[\s\S]*:[\s\S]*"([^"]+)"[\s\S]*\}/);
         if (jsonMatch && jsonMatch[1]) {
             return jsonMatch[1].replace(/\\n/g, '\n').trim();
         }
 
-        // 行ごとに分割して日本語（ひらがな・カタカナ・漢字）の密度が高い行だけを連結
         const lines = rawText.split('\n');
         const japaneseLines = [];
 
@@ -1156,15 +1154,12 @@
             const trimmed = line.trim();
             if (!trimmed) continue;
             
-            // 英語の見出しやメタデータ行を除外
             if (/^(Constraint|Image|Draft|Context|Characters|Key Plot|Refinement|Title|Content|Length|No spoilers|Final Version|\*)/i.test(trimmed)) {
                 continue;
             }
 
-            // ひらがな・漢字を3文字以上含む実質的な日本語行のみ抽出
             const jpMatch = trimmed.match(/[\u3040-\u309F\u4E00-\u9FAF]/g);
             if (jpMatch && jpMatch.length >= 4) {
-                // 箇条書き記号などの先頭ゴミを除去
                 const cleaned = trimmed.replace(/^[\*\-\d\.\s【】]+/, '').trim();
                 if (cleaned) japaneseLines.push(cleaned);
             }
@@ -1249,6 +1244,7 @@
         }
     };
 
+    // P.1〜現在ページまでの全区間探索 ＋ ハイブリッド人物解説アクション
     window.queryCharacterAction = async function() {
         const charName = aiCharacterInput.value.trim();
         if (!charName) {
@@ -1264,13 +1260,26 @@
             return;
         }
 
-        aiCharacterResult.textContent = `「${charName}」の情報を探索中... ⏳`;
+        aiCharacterResult.textContent = `P.1〜P.${currentPage} を探索して「${charName}」の情報を整理中... ⏳`;
 
         try {
+            const bookTitle = currentBook.title || '小説・書籍';
+            // 冒頭から現在ページまでを幅広くサンプリング抽出
             const imageParts = await extractPageImagesForAI(1, currentPage, 8);
-            const promptText = `添付された本文画像（P.1〜P.${currentPage}）をもとに、「${charName}」という登場人物の立場や主人公との関係性を教えてください。
-英語や思考プロセスは含めず、以下のJSON形式のみを出力してください。
-{"summary": "ここに${charName}の立場・職業・主人公との関係性を2〜4行の日本語で簡潔に記述（ネタバレ禁止）"}`;
+
+            const promptText = `あなたは小説読書アシスタントです。
+作品名：『${bookTitle}』
+調査対象の人物名：『${charName}』
+現在の読書位置：P.${currentPage}まで
+
+添付された本文画像（P.1〜P.${currentPage}の抜粋）および作品設定をもとに、「${charName}」について解説してください。
+
+【厳格な指示】
+1. P.${currentPage}までの範囲で作中に登場・言及されている「立場・職業・身分」「主人公との関係性」「どのような人物か」を2〜4行程度の自然な日本語で解説してください。
+2. もし画像内に直接の記述が少ない場合でも、「画像に見当たらない」等のメタ発言は絶対に書かず、作品のジャンル・時代背景・文脈から推測される役割を自然に説明してください。
+3. ネタバレは一切書かないでください。
+4. 英語の思考メモは含めず、以下のJSON形式のみを出力してください。
+{"summary": "ここに解説文"}`;
 
             const parts = [{ text: promptText }, ...imageParts];
             const rawResult = await callGeminiVision(parts);

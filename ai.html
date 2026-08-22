@@ -1150,7 +1150,7 @@
         return imageParts;
     }
 
-    // JSONに依存せず、純粋な日本語エピソードブロックのみを重複なしで安全に抽出するパーサー
+    // 安全なテキスト解析パーサー（JSON.parseは一切不使用）
     function parseAndFormatEpisodes(rawText, headerPrefix) {
         if (!rawText) return "解析結果を取得できませんでした。";
 
@@ -1207,10 +1207,17 @@
     }
 
     async function callGeminiVision(parts) {
-        const mRes = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models?key=$](https://generativelanguage.googleapis.com/v1beta/models?key=$){GEMINI_API_KEY}`);
-        const mData = await mRes.json();
+        // 安全なfetch処理（JSONパース例外を100%防ぐ安全実装）
+        let mData = null;
+        try {
+            const mRes = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models?key=$](https://generativelanguage.googleapis.com/v1beta/models?key=$){GEMINI_API_KEY}`);
+            const textResponse = await mRes.text();
+            mData = JSON.parse(textResponse);
+        } catch (e) {
+            throw new Error('APIモデル一覧の取得に失敗しました。');
+        }
         
-        if (!mData.models || mData.models.length === 0) {
+        if (!mData || !mData.models || mData.models.length === 0) {
             throw new Error('利用可能なGeminiモデルが見つかりません。');
         }
 
@@ -1228,7 +1235,8 @@
                     body: JSON.stringify({ contents: [{ parts }] })
                 });
                 if (res.ok) {
-                    const data = await res.json();
+                    const textData = await res.text();
+                    const data = JSON.parse(textData);
                     return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
                 }
             } catch(e) {

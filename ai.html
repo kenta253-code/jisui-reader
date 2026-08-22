@@ -499,16 +499,16 @@
             <div class="drawer-content">
                 <div class="ai-section-box">
                     <div class="ai-section-title">
-                        <span>📖 これまでのあらすじ要約</span>
+                        <span>📖 主要エピソード（出来事の流れ）</span>
                     </div>
                     <div class="ai-toggle-group">
                         <button class="ai-toggle-btn active" id="btnSummaryRecent" onclick="setSummaryRange('recent')">直前 (前回の栞〜現在)</button>
                         <button class="ai-toggle-btn" id="btnSummaryTotal" onclick="setSummaryRange('total')">全体 (冒頭〜現在)</button>
                     </div>
                     <button class="btn btn-primary" id="btnGenerateSummary" style="font-size: 12px; justify-content: center;" onclick="generateSummaryAction()">
-                        ✨ あらすじを生成・更新
+                        ✨ エピソードを抽出・更新
                     </button>
-                    <div class="ai-result-box" id="aiSummaryResult">「あらすじを生成」を押すと、ネタバレなしでここまでの流れを3〜5行で要約します。</div>
+                    <div class="ai-result-box" id="aiSummaryResult">「エピソードを抽出」を押すと、起きた出来事を箇条書きで分かりやすく整理します。</div>
                 </div>
 
                 <div class="ai-section-box">
@@ -680,7 +680,7 @@
         activeSummaryRange = 'recent';
         document.getElementById('btnSummaryRecent').classList.add('active');
         document.getElementById('btnSummaryTotal').classList.remove('active');
-        aiSummaryResult.textContent = '「あらすじを生成」を押すと、ネタバレなしでここまでの流れを3〜5行で要約します。';
+        aiSummaryResult.textContent = '「エピソードを抽出」を押すと、起きた出来事を箇条書きで分かりやすく整理します。';
     }
 
     async function renderCollectionTabs(allBooks) {
@@ -1093,11 +1093,11 @@
     function getSummaryKey() {
         const currentPage = pageNum;
         if (activeSummaryRange === 'total') {
-            return `total_p${currentPage}`;
+            return `total_episodes_p${currentPage}`;
         } else {
             const bms = (currentBook.bookmarks || []).filter(b => b.page < currentPage);
             const prevPage = bms.length > 0 ? bms[bms.length - 1].page : (currentPage > 2 ? 2 : 1);
-            return `recent_p${prevPage}_to_p${currentPage}`;
+            return `recent_episodes_p${prevPage}_to_p${currentPage}`;
         }
     }
 
@@ -1108,8 +1108,8 @@
             aiSummaryResult.textContent = currentBook.aiSummaries[key];
         } else {
             aiSummaryResult.textContent = activeSummaryRange === 'recent' 
-                ? '「あらすじを生成」を押すと、直前のしおり位置から現在までの展開を要約します。'
-                : '「あらすじを生成」を押すと、冒頭から現在までのストーリー全体を要約します。';
+                ? '「エピソードを抽出」を押すと、直前のしおり位置から現在までの出来事を箇条書きで整理します。'
+                : '「エピソードを抽出」を押すと、冒頭から現在までの主な出来事を箇条書きで整理します。';
         }
     }
 
@@ -1173,7 +1173,10 @@
             const jpMatch = trimmed.match(/[\u3040-\u309F\u4E00-\u9FAF]/g);
             if (jpMatch && jpMatch.length >= 4) {
                 const cleaned = trimmed.replace(/^[\*\-\d\.\s【】]+/, '').trim();
-                if (cleaned) japaneseLines.push(cleaned);
+                if (cleaned) {
+                    // 箇条書き記号を付与して整形
+                    japaneseLines.push(cleaned.startsWith('・') ? cleaned : '・' + cleaned);
+                }
             }
         }
 
@@ -1216,6 +1219,7 @@
         throw new Error('利用可能なGeminiモデルでの解析に失敗しました。');
     }
 
+    // 主要エピソード抽出アクション
     window.generateSummaryAction = async function() {
         if (!pdfDoc || !currentBook) return;
 
@@ -1226,7 +1230,7 @@
             startPage = bms.length > 0 ? bms[bms.length - 1].page : (currentPage > 2 ? 2 : 1);
         }
 
-        aiSummaryResult.textContent = `P.${startPage} 〜 P.${currentPage} を解析中... ⏳`;
+        aiSummaryResult.textContent = `P.${startPage} 〜 P.${currentPage} を探索して出来事を抽出中... ⏳`;
         const btn = document.getElementById('btnGenerateSummary');
         btn.disabled = true;
 
@@ -1234,13 +1238,17 @@
             const imageParts = await extractPageImagesForAI(startPage, currentPage, 6);
             if (imageParts.length === 0) throw new Error("ページの読み込みに失敗しました。");
 
-            const promptText = `添付された本文ページ画像（P.${startPage}〜P.${currentPage}）を読み取り、この範囲のあらすじを日本語で要約してください。
-英語や思考プロセスは含めず、以下のJSON形式のみを出力してください。
-{"summary": "ここにP.${startPage}〜P.${currentPage}で起きている主要な出来事・登場人物の行動・状況の変化を3〜5行の自然な日本語で記述（ネタバレ禁止）"}`;
+            const promptText = `あなたは小説読書アシスタントです。添付された本文ページ画像（P.${startPage}〜P.${currentPage}）を読み取り、この範囲で起きた「主要な出来事・エピソード」を時系列順に3〜4つの箇条書きで抽出してください。
+
+【厳格な指示】
+1. 抽象的な要約文ではなく、「誰が・どこで・何をしたか」「何が起きたか」という具体的な出来事を箇条書き（・で始まる形式）で記述してください。
+2. P.${currentPage}より先の展開（ネタバレ）は絶対に含めないでください。
+3. 英語の思考プロセスは一切含めず、以下のJSON形式のみを出力してください。
+{"summary": "【P.${startPage}〜P.${currentPage} の主要エピソード】\\n・（出来事1）\\n・（出来事2）\\n・（出来事3）"}`;
 
             const parts = [{ text: promptText }, ...imageParts];
             const rawResult = await callGeminiVision(parts);
-            const resultText = cleanAIResponse(rawResult, `【P.${startPage}〜P.${currentPage} のあらすじ】`);
+            const resultText = cleanAIResponse(rawResult, `【P.${startPage}〜P.${currentPage} の主要エピソード】`);
 
             const key = getSummaryKey();
             if (!currentBook.aiSummaries) currentBook.aiSummaries = {};
@@ -1248,7 +1256,7 @@
             await saveBook(currentBook);
 
             aiSummaryResult.textContent = resultText;
-            showToast('あらすじを生成・保存しました');
+            showToast('主要エピソードを抽出・保存しました');
         } catch (err) {
             aiSummaryResult.textContent = `❌ エラー: ${err.message}`;
         } finally {
@@ -1256,6 +1264,7 @@
         }
     };
 
+    // 人物解説アクション
     window.queryCharacterAction = async function() {
         const charName = aiCharacterInput.value.trim();
         if (!charName) {

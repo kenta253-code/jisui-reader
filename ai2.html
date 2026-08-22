@@ -1114,89 +1114,50 @@
         return imageParts;
     }
 
-    // 綺麗に日本語の回答部分のみを抽出するパーサー
-    function cleanAnswerText(rawText) {
-        if (!rawText) return "回答を取得できませんでした。";
-
-        let text = rawText.replace(/\*\*/g, '').replace(/```[a-z]*/gi, '').trim();
-        const lines = text.split('\n');
-        const validLines = [];
-
-        for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed) {
-                if (validLines.length > 0 && validLines[validLines.length - 1] !== '') {
-                    validLines.push('');
-                }
-                continue;
-            }
-
-            if (/^(Novel Reading|Assistant|The Town|Image \d|Title Page|P\.\s*\d+|Please summarize|Output|English|No spoilers|Constraint|Draft|Context|Characters|Key Plot|Refinement|Title|Content|Length|Final Version|Okay|\*|Do not|Yes\.|No\.)/i.test(trimmed)) {
-                continue;
-            }
-            if (/^\d+\.\s*(Do\s|Output\s|No\s|Please\s)/i.test(trimmed)) {
-                continue;
-            }
-            if (/^[A-Za-z0-9\s"'\.,\-_–—:;?\(\)]+$/.test(trimmed)) {
-                continue;
-            }
-
-            const jpCount = (trimmed.match(/[\u3040-\u309F\u4E00-\u9FAF]/g) || []).length;
-            if (jpCount >= 3) {
-                validLines.push(trimmed);
-            }
-        }
-
-        const cleaned = validLines.join('\n').trim();
-        return cleaned || text;
-    }
-
-    // 動的モデル自動検出による安全・確実な通信方式
+    // 動的モデル検出による確実な通信方式（最初の安定版）
     async function callGeminiVision(parts) {
-        let candidateModels = [
-            { name: 'models/gemini-1.5-flash' },
-            { name: 'models/gemini-2.0-flash' },
-            { name: 'models/gemini-2.5-flash' }
-        ];
+        let candidateModels = [];
 
         try {
-            const mRes = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models?key=$](https://generativelanguage.googleapis.com/v1beta/models?key=$){GEMINI_API_KEY}`);
+            const mRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`);
             if (mRes.ok) {
                 const mData = await mRes.json();
                 if (mData && mData.models) {
-                    const valid = mData.models.filter(m => 
+                    candidateModels = mData.models.filter(m => 
                         m.supportedGenerationMethods && 
                         m.supportedGenerationMethods.includes('generateContent') && 
                         !m.name.includes('embedding')
                     );
-                    if (valid.length > 0) candidateModels = valid;
                 }
             }
         } catch (e) {}
 
-        let lastErrMsg = '';
+        if (candidateModels.length === 0) {
+            candidateModels = [
+                { name: 'models/gemini-1.5-flash' },
+                { name: 'models/gemini-2.0-flash' },
+                { name: 'models/gemini-1.5-pro' }
+            ];
+        }
+
         for (const model of candidateModels) {
             try {
                 const endpointName = model.name.startsWith('models/') ? model.name : `models/${model.name}`;
-                const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/$](https://generativelanguage.googleapis.com/v1beta/$){endpointName}:generateContent?key=${GEMINI_API_KEY}`, {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/${endpointName}:generateContent?key=${GEMINI_API_KEY}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ contents: [{ parts }] })
                 });
-
                 if (res.ok) {
                     const data = await res.json();
                     const result = data.candidates?.[0]?.content?.parts?.[0]?.text;
                     if (result) return result;
-                } else {
-                    const errData = await res.json().catch(() => ({}));
-                    lastErrMsg = errData.error?.message || `HTTP ${res.status}`;
                 }
             } catch(e) {
-                lastErrMsg = e.message || 'ネットワーク接続エラー';
+                continue;
             }
         }
-        throw new Error(`AI解析エラー (${lastErrMsg})`);
+        throw new Error('Gemini APIでの通信に失敗しました。時間をおいて再試行してください。');
     }
 
     // フリー質問送信アクション
@@ -1225,12 +1186,22 @@
 
             const bookTitle = currentBook.title || '書籍';
 
-            const promptText = `作品名：『${bookTitle}』\n探索範囲：P.${startPage} 〜 P.${currentPage}\n読者の質問：${queryText}\n\n【指示】ネタバレを含めず、思考プロセス等の英語を出力せず、自然な日本語の回答のみを出力してください。`;
-            const parts = [{ text: promptText }, ...imageParts];
+            const promptText = `あなたは小説読書アシスタントです。
+作品名：『${bookTitle}』
+探索範囲：P.${startPage} 〜 P.${currentPage}
+読者の質問・指示：
+「${queryText}」
 
+添付された本文画像（P.${startPage}〜P.${currentPage}の抜粋）をもとに、読者の質問に直接、分かりやすく日本語で回答してください。
+
+【厳格な指示】
+1. P.${currentPage}より先の展開（ネタバレ）は絶対に含めないでください。
+2. 思考プロセス、英語の要約、メタ確認メモは一切書かず、読者の質問に対する【自然な日本語の回答本文のみ】を出力してください。`;
+
+            const parts = [{ text: promptText }, ...imageParts];
             const rawResult = await callGeminiVision(parts);
             
-            const resultText = `【回答】\n\n` + cleanAnswerText(rawResult);
+            const resultText = `【回答】\n\n` + rawResult.replace(/\*\*/g, '').trim();
             aiQueryResult.textContent = resultText;
             showToast('回答を生成しました');
         } catch (err) {

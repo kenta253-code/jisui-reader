@@ -1114,7 +1114,7 @@
         return imageParts;
     }
 
-    // 英語メタ行や思考メモを完全カットし、綺麗に日本語回答を抽出するパーサー
+    // 綺麗に日本語の回答部分のみを抽出するパーサー
     function cleanAnswerText(rawText) {
         if (!rawText) return "回答を取得できませんでした。";
 
@@ -1151,22 +1151,52 @@
         return cleaned || text;
     }
 
-    // 最も安定した標準の generateContent 方式
+    // 動的モデル自動検出による安全・確実な通信方式
     async function callGeminiVision(parts) {
-        const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$){GEMINI_API_KEY}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts }] })
-        });
+        let candidateModels = [
+            { name: 'models/gemini-1.5-flash' },
+            { name: 'models/gemini-2.0-flash' },
+            { name: 'models/gemini-2.5-flash' }
+        ];
 
-        if (res.ok) {
-            const data = await res.json();
-            const result = data.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (result) return result;
+        try {
+            const mRes = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models?key=$](https://generativelanguage.googleapis.com/v1beta/models?key=$){GEMINI_API_KEY}`);
+            if (mRes.ok) {
+                const mData = await mRes.json();
+                if (mData && mData.models) {
+                    const valid = mData.models.filter(m => 
+                        m.supportedGenerationMethods && 
+                        m.supportedGenerationMethods.includes('generateContent') && 
+                        !m.name.includes('embedding')
+                    );
+                    if (valid.length > 0) candidateModels = valid;
+                }
+            }
+        } catch (e) {}
+
+        let lastErrMsg = '';
+        for (const model of candidateModels) {
+            try {
+                const endpointName = model.name.startsWith('models/') ? model.name : `models/${model.name}`;
+                const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/$](https://generativelanguage.googleapis.com/v1beta/$){endpointName}:generateContent?key=${GEMINI_API_KEY}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts }] })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    const result = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (result) return result;
+                } else {
+                    const errData = await res.json().catch(() => ({}));
+                    lastErrMsg = errData.error?.message || `HTTP ${res.status}`;
+                }
+            } catch(e) {
+                lastErrMsg = e.message || 'ネットワーク接続エラー';
+            }
         }
-
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error?.message || `HTTP 通信エラー`);
+        throw new Error(`AI解析エラー (${lastErrMsg})`);
     }
 
     // フリー質問送信アクション

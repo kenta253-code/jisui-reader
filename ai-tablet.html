@@ -259,8 +259,8 @@
         #readerBookTitle { font-size: 14px; font-weight: 600; max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         #pageInfo { font-size: 14px; min-width: 90px; text-align: center; font-weight: 600; }
 
-        #viewer-container { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; background-color: var(--bg-main); overflow: hidden; }
-        #spread { display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 30px rgba(0,0,0,0.4); background-color: #fff; position: relative; }
+        #viewer-container { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; background-color: var(--bg-main); overflow: hidden; padding: 8px; }
+        #spread { display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 30px rgba(0,0,0,0.4); background-color: #fff; position: relative; max-width: 100%; max-height: 100%; }
         canvas { display: block; background-color: #fff; }
         .click-zone { position: absolute; top: 0; bottom: 0; width: 45%; cursor: pointer; z-index: 5; }
         #left-zone { left: 0; }
@@ -650,6 +650,15 @@
     let pageNum = 1;
     let mode = 'rtl';
 
+    // 縦長（ポートレート）判定関数
+    function isPortraitMode() {
+        const container = document.getElementById('viewer-container');
+        if (container && container.clientWidth > 0 && container.clientHeight > 0) {
+            return container.clientWidth < container.clientHeight;
+        }
+        return window.innerWidth < window.innerHeight;
+    }
+
     function applyTheme(theme) {
         document.body.setAttribute('data-theme', theme);
         shelfThemeSelect.value = theme;
@@ -945,9 +954,13 @@
     });
 
     function getCurrentVisiblePages() {
+        if (!pdfDoc) return [pageNum];
+        if (isPortraitMode()) {
+            return [pageNum];
+        }
         if (pageNum === 1) return [1];
-        const p1 = pageNum;
-        const p2 = pageNum + 1 <= pdfDoc.numPages ? pageNum + 1 : null;
+        const p1 = (pageNum % 2 === 0) ? pageNum : pageNum - 1;
+        const p2 = p1 + 1 <= pdfDoc.numPages ? p1 + 1 : null;
         return p2 ? [p1, p2] : [p1];
     }
 
@@ -1047,10 +1060,14 @@
 
     function jumpToPage(targetPage) {
         if (!pdfDoc) return;
-        if (targetPage === 1) {
-            pageNum = 1;
+        if (isPortraitMode()) {
+            pageNum = targetPage;
         } else {
-            pageNum = (targetPage % 2 === 0) ? targetPage : targetPage - 1;
+            if (targetPage === 1) {
+                pageNum = 1;
+            } else {
+                pageNum = (targetPage % 2 === 0) ? targetPage : targetPage - 1;
+            }
         }
         renderSpread();
         updateBookmarkUI();
@@ -1288,7 +1305,7 @@
 
         const currentPage = pageNum;
         let startPage = 1;
-        if (activeScope === 'recent') {
+        if (activeSummaryRange === 'recent') {
             const bms = (currentBook.bookmarks || []).filter(b => b.page < currentPage);
             startPage = bms.length > 0 ? bms[bms.length - 1].page : (currentPage > 2 ? 2 : 1);
         }
@@ -1388,6 +1405,7 @@
         if (pdfDoc) renderSpread();
     });
 
+    // 指定の高さに合わせて描画（横見開き用）
     async function getRenderedCanvas(num, targetHeight) {
         if (num < 1 || num > pdfDoc.numPages) return null;
         const page = await pdfDoc.getPage(num);
@@ -1403,35 +1421,65 @@
         return canvas;
     }
 
+    // 縦持ち1ページ表示用のぴったり自動フィット描画
+    async function getRenderedCanvasFit(num, containerWidth, containerHeight) {
+        if (num < 1 || num > pdfDoc.numPages) return null;
+        const page = await pdfDoc.getPage(num);
+        const unscaledViewport = page.getViewport({ scale: 1.0 });
+        
+        const scaleW = (containerWidth - 16) / unscaledViewport.width;
+        const scaleH = (containerHeight - 16) / unscaledViewport.height;
+        const scale = Math.min(scaleW, scaleH);
+
+        const viewport = page.getViewport({ scale: scale });
+        const canvas = document.createElement('canvas');
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        const ctx = canvas.getContext('2d');
+        await page.render({ canvasContext: ctx, viewport }).promise;
+        return canvas;
+    }
+
     async function renderSpread() {
         if (!pdfDoc) return;
         spread.innerHTML = '';
 
-        const containerHeight = document.getElementById('viewer-container').clientHeight - 16;
+        const container = document.getElementById('viewer-container');
+        const containerWidth = container.clientWidth;
+        const containerHeight = container.clientHeight;
+        const portrait = isPortraitMode();
 
-        if (pageNum === 1) {
-            pageInfo.textContent = `1 / ${pdfDoc.numPages}`;
-            const canvas = await getRenderedCanvas(1, containerHeight);
+        if (portrait) {
+            // 【縦持ち：1ページ単独表示】
+            pageInfo.textContent = `${pageNum} / ${pdfDoc.numPages}`;
+            const canvas = await getRenderedCanvasFit(pageNum, containerWidth, containerHeight);
             if (canvas) spread.appendChild(canvas);
         } else {
-            const p1 = pageNum;
-            const p2 = pageNum + 1 <= pdfDoc.numPages ? pageNum + 1 : null;
-            pageInfo.textContent = p2 ? `${p1}-${p2} / ${pdfDoc.numPages}` : `${p1} / ${pdfDoc.numPages}`;
-
-            let leftPageNum, rightPageNum;
-            if (mode === 'rtl') {
-                leftPageNum = p2;
-                rightPageNum = p1;
+            // 【横持ち：見開き2ページ表示】
+            if (pageNum === 1) {
+                pageInfo.textContent = `1 / ${pdfDoc.numPages}`;
+                const canvas = await getRenderedCanvas(1, containerHeight - 16);
+                if (canvas) spread.appendChild(canvas);
             } else {
-                leftPageNum = p1;
-                rightPageNum = p2;
+                const p1 = (pageNum % 2 === 0) ? pageNum : pageNum - 1;
+                const p2 = p1 + 1 <= pdfDoc.numPages ? p1 + 1 : null;
+                pageInfo.textContent = p2 ? `${p1}-${p2} / ${pdfDoc.numPages}` : `${p1} / ${pdfDoc.numPages}`;
+
+                let leftPageNum, rightPageNum;
+                if (mode === 'rtl') {
+                    leftPageNum = p2;
+                    rightPageNum = p1;
+                } else {
+                    leftPageNum = p1;
+                    rightPageNum = p2;
+                }
+
+                const leftCanvas = leftPageNum ? await getRenderedCanvas(leftPageNum, containerHeight - 16) : null;
+                const rightCanvas = rightPageNum ? await getRenderedCanvas(rightPageNum, containerHeight - 16) : null;
+
+                if (leftCanvas) spread.appendChild(leftCanvas);
+                if (rightCanvas) spread.appendChild(rightCanvas);
             }
-
-            const leftCanvas = leftPageNum ? await getRenderedCanvas(leftPageNum, containerHeight) : null;
-            const rightCanvas = rightPageNum ? await getRenderedCanvas(rightPageNum, containerHeight) : null;
-
-            if (leftCanvas) spread.appendChild(leftCanvas);
-            if (rightCanvas) spread.appendChild(rightCanvas);
         }
 
         if (currentBook) {
@@ -1445,26 +1493,44 @@
 
     function nextPage() {
         if (!pdfDoc) return;
-        if (pageNum === 1) {
-            if (pdfDoc.numPages >= 2) pageNum = 2;
-        } else {
-            if (pageNum + 2 <= pdfDoc.numPages) {
-                pageNum += 2;
-            } else if (pageNum + 1 <= pdfDoc.numPages) {
-                pageNum += 2;
+        if (isPortraitMode()) {
+            // 縦持ち時は1ページずつ進む
+            if (pageNum < pdfDoc.numPages) {
+                pageNum += 1;
+                renderSpread();
             }
+        } else {
+            // 横持ち見開き時は2ページずつ進む
+            if (pageNum === 1) {
+                if (pdfDoc.numPages >= 2) pageNum = 2;
+            } else {
+                if (pageNum + 2 <= pdfDoc.numPages) {
+                    pageNum += 2;
+                } else if (pageNum + 1 <= pdfDoc.numPages) {
+                    pageNum += 2;
+                }
+            }
+            renderSpread();
         }
-        renderSpread();
     }
 
     function prevPage() {
         if (!pdfDoc) return;
-        if (pageNum === 2) {
-            pageNum = 1;
-        } else if (pageNum > 2) {
-            pageNum -= 2;
+        if (isPortraitMode()) {
+            // 縦持ち時は1ページずつ戻る
+            if (pageNum > 1) {
+                pageNum -= 1;
+                renderSpread();
+            }
+        } else {
+            // 横持ち見開き時は2ページずつ戻る
+            if (pageNum === 2) {
+                pageNum = 1;
+            } else if (pageNum > 2) {
+                pageNum -= 2;
+            }
+            renderSpread();
         }
-        renderSpread();
     }
 
     btnNext.addEventListener('click', nextPage);
@@ -1507,6 +1573,14 @@
         if (pdfDoc && readerView.style.display === 'flex') {
             renderSpread();
         }
+    });
+
+    window.addEventListener('orientationchange', () => {
+        setTimeout(() => {
+            if (pdfDoc && readerView.style.display === 'flex') {
+                renderSpread();
+            }
+        }, 200);
     });
 
     openDB().then(() => {

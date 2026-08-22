@@ -1,1 +1,1520 @@
 
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>自炊本リーダー [タブレットAI版]</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📱</text></svg>">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        :root {
+            --bg-main: #1e1e1e;
+            --bg-card: #2a2a2a;
+            --bg-toolbar: #181818;
+            --bg-modal: #252525;
+            --text-color: #efefef;
+            --text-sub: #aaaaaa;
+            --btn-bg: #333333;
+            --btn-hover: #444444;
+            --border-color: #444;
+            --accent-color: #2d6cdf;
+            --accent-hover: #3b7ced;
+            --progress-bg: #444;
+            --progress-fill: #2d6cdf;
+            --bookmark-active: #e6a23c;
+            --bookmark-active-hover: #cf8a26;
+            --tab-active-bg: #2d6cdf;
+            --tab-active-text: #ffffff;
+            --ai-badge-bg: #6366f1;
+        }
+
+        body[data-theme="wood"] {
+            --bg-main: #362217;
+            --bg-card: #2a1910;
+            --bg-toolbar: #22140d;
+            --bg-modal: #2b1a11;
+            --text-color: #f7ebe1;
+            --text-sub: #c4ad9b;
+            --btn-bg: #482f21;
+            --btn-hover: #5a3b2a;
+            --border-color: #4e3324;
+            --accent-color: #c9732e;
+            --accent-hover: #dc843b;
+            --progress-bg: #482f21;
+            --progress-fill: #c9732e;
+            --bookmark-active: #d97724;
+            --bookmark-active-hover: #bf6419;
+            --tab-active-bg: #c9732e;
+            --tab-active-text: #ffffff;
+            --ai-badge-bg: #d97724;
+        }
+
+        body[data-theme="dark"] {
+            --bg-main: #181818;
+            --bg-card: #252525;
+            --bg-toolbar: #121212;
+            --bg-modal: #222222;
+            --text-color: #efefef;
+            --text-sub: #999999;
+            --btn-bg: #2e2e2e;
+            --btn-hover: #3e3e3e;
+            --border-color: #383838;
+            --accent-color: #2d6cdf;
+            --progress-bg: #3a3a3a;
+            --progress-fill: #2d6cdf;
+            --bookmark-active: #e6a23c;
+            --bookmark-active-hover: #cf8a26;
+            --tab-active-bg: #2d6cdf;
+            --tab-active-text: #ffffff;
+            --ai-badge-bg: #6366f1;
+        }
+
+        body[data-theme="sepia"] {
+            --bg-main: #e8dfcf;
+            --bg-card: #f2e9db;
+            --bg-toolbar: #d4c8b2;
+            --bg-modal: #f0e6d6;
+            --text-color: #3b2e2a;
+            --text-sub: #7a6b63;
+            --btn-bg: #c5b79e;
+            --btn-hover: #b5a58a;
+            --border-color: #a89980;
+            --accent-color: #8c5b3e;
+            --accent-hover: #a36d4d;
+            --progress-bg: #c0b39c;
+            --progress-fill: #8c5b3e;
+            --bookmark-active: #b86e28;
+            --bookmark-active-hover: #9c5c1e;
+            --tab-active-bg: #8c5b3e;
+            --tab-active-text: #ffffff;
+            --ai-badge-bg: #8c5b3e;
+        }
+
+        body[data-theme="light"] {
+            --bg-main: #f5f5f7;
+            --bg-card: #ffffff;
+            --bg-toolbar: #e8e8ed;
+            --bg-modal: #ffffff;
+            --text-color: #1d1d1f;
+            --text-sub: #6e6e73;
+            --btn-bg: #ffffff;
+            --btn-hover: #e5e5ea;
+            --border-color: #d2d2d7;
+            --accent-color: #0071e3;
+            --accent-hover: #0077ed;
+            --progress-bg: #e5e5ea;
+            --progress-fill: #0071e3;
+            --bookmark-active: #e68a00;
+            --bookmark-active-hover: #cc7a00;
+            --tab-active-bg: #0071e3;
+            --tab-active-text: #ffffff;
+            --ai-badge-bg: #0071e3;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-main);
+            color: var(--text-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Meiryo", sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            user-select: none;
+            touch-action: manipulation;
+            transition: background-color 0.2s ease, color 0.2s ease;
+        }
+
+        .btn {
+            background-color: var(--btn-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px 14px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+            min-height: 38px;
+        }
+        .btn:hover, .btn:active { background-color: var(--btn-hover); }
+        .btn-primary { background-color: var(--accent-color); color: #ffffff !important; border: none; }
+        .btn-primary:hover, .btn-primary:active { background-color: var(--accent-hover); }
+        .btn-ai { background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); color: #ffffff !important; border: none; }
+        .btn-ai:hover, .btn-ai:active { opacity: 0.9; }
+        .btn-bookmark-active { background-color: var(--bookmark-active) !important; color: #ffffff !important; border-color: var(--bookmark-active) !important; }
+        .btn-bookmark-active:hover { background-color: var(--bookmark-active-hover) !important; }
+        .btn-danger { background-color: transparent; color: #ff5c5c; border: 1px solid rgba(255, 92, 92, 0.4); padding: 4px 8px; font-size: 12px; border-radius: 6px; }
+        .btn-danger:hover, .btn-danger:active { background-color: #ff5c5c; color: white; }
+
+        select, input[type="text"] {
+            background-color: var(--btn-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 14px;
+            outline: none;
+            min-height: 38px;
+        }
+
+        #bookshelf-view {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background-color: var(--bg-main);
+            transition: background 0.2s ease;
+        }
+
+        .shelf-header {
+            height: 60px;
+            background-color: var(--bg-toolbar);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            border-bottom: 1px solid var(--border-color);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            z-index: 10;
+        }
+        .shelf-title { font-size: 19px; font-weight: bold; display: flex; align-items: center; gap: 10px; }
+        .ai-pill { font-size: 11px; font-weight: bold; background: linear-gradient(135deg, #6366f1, #a855f7); color: white; padding: 3px 8px; border-radius: 12px; }
+
+        .collection-bar {
+            background-color: var(--bg-toolbar);
+            display: flex;
+            align-items: center;
+            padding: 10px 20px;
+            gap: 10px;
+            border-bottom: 1px solid var(--border-color);
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+        .collection-tab {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            background-color: var(--btn-bg);
+            color: var(--text-sub);
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            min-height: 36px;
+        }
+        .collection-tab.active { background-color: var(--tab-active-bg); color: var(--tab-active-text); border-color: var(--tab-active-bg); }
+        .btn-add-collection { padding: 6px 12px; font-size: 13px; border-radius: 20px; background: transparent; border: 1px dashed var(--border-color); color: var(--text-sub); }
+
+        .shelf-container { flex: 1; overflow-y: auto; padding: 24px 20px; }
+        .book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 24px 18px; max-width: 1400px; margin: 0 auto; }
+        .book-card {
+            background-color: var(--bg-card);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            border: 1px solid var(--border-color);
+        }
+        .book-cover-wrap { width: 100%; height: 200px; background-color: #111; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .book-cover-wrap img { width: 100%; height: 100%; object-fit: contain; }
+        .book-cover-placeholder { color: #666; font-size: 32px; }
+        .book-info { padding: 10px 12px; display: flex; flex-direction: column; gap: 5px; flex: 1; }
+        .book-title { font-size: 13px; font-weight: 600; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .book-progress-text { font-size: 11px; color: var(--text-sub); margin-top: auto; }
+        .progress-bar-bg { width: 100%; height: 4px; background-color: var(--progress-bg); border-radius: 2px; overflow: hidden; margin-top: 4px; }
+        .progress-bar-fill { height: 100%; background-color: var(--progress-fill); border-radius: 2px; }
+        .card-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border-color); font-size: 11px; color: var(--text-sub); }
+        .card-action-btn { background: transparent; border: none; color: var(--text-sub); cursor: pointer; padding: 4px 6px; font-size: 12px; border-radius: 4px; }
+
+        .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 50vh; color: var(--text-sub); text-align: center; gap: 12px; }
+        .empty-state-icon { font-size: 52px; opacity: 0.7; }
+
+        #reader-view { flex: 1; display: none; flex-direction: column; height: 100vh; overflow: hidden; position: relative; }
+        .toolbar {
+            height: 56px;
+            background-color: var(--bg-toolbar);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 16px;
+            border-bottom: 1px solid var(--border-color);
+            z-index: 10;
+            gap: 8px;
+        }
+        body.fullscreen-mode .toolbar { position: absolute; top: 0; left: 0; right: 0; opacity: 0; transform: translateY(-100%); transition: all 0.25s ease; }
+        body.fullscreen-mode .toolbar:hover, body.fullscreen-mode .toolbar:focus-within { opacity: 1; transform: translateY(0); }
+        .toolbar-group { display: flex; align-items: center; gap: 8px; }
+        #readerBookTitle { font-size: 14px; font-weight: 600; max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        #pageInfo { font-size: 14px; min-width: 90px; text-align: center; font-weight: 600; }
+
+        #viewer-container { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; background-color: var(--bg-main); overflow: hidden; }
+        #spread { display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 30px rgba(0,0,0,0.4); background-color: #fff; position: relative; }
+        canvas { display: block; background-color: #fff; }
+        .click-zone { position: absolute; top: 0; bottom: 0; width: 45%; cursor: pointer; z-index: 5; }
+        #left-zone { left: 0; }
+        #right-zone { right: 0; }
+
+        .side-drawer {
+            position: absolute;
+            top: 56px; right: 0; bottom: 0;
+            width: 420px;
+            max-width: 85vw;
+            background-color: var(--bg-modal);
+            border-left: 1px solid var(--border-color);
+            box-shadow: -4px 0 25px rgba(0,0,0,0.35);
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            transform: translateX(100%);
+            transition: transform 0.25s ease;
+        }
+        .side-drawer.open { transform: translateX(0); }
+        .drawer-header { padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); font-weight: 700; font-size: 14px; }
+        .drawer-content { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+
+        .bookmark-item {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+        }
+        .bookmark-item-title { font-size: 13px; font-weight: 700; }
+        .bookmark-item-date { font-size: 11px; color: var(--text-sub); margin-top: 2px; }
+
+        .ai-section-box {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .ai-section-title { font-size: 13px; font-weight: 700; color: var(--accent-color); display: flex; align-items: center; gap: 6px; }
+        .ai-toggle-group { display: flex; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 3px; gap: 4px; }
+        .ai-toggle-btn { flex: 1; padding: 7px; font-size: 12px; font-weight: 600; background: transparent; border: none; color: var(--text-sub); border-radius: 6px; cursor: pointer; }
+        .ai-toggle-btn.active { background: var(--accent-color); color: #fff; }
+        .ai-result-box {
+            font-size: 13.5px;
+            line-height: 1.8;
+            color: var(--text-color);
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            padding: 14px;
+            min-height: 70px;
+            white-space: pre-wrap;
+            border: 1px solid var(--border-color);
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.65);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+        .modal-overlay.open { opacity: 1; pointer-events: auto; }
+        .modal-card {
+            background-color: var(--bg-modal);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            width: 90%;
+            max-width: 440px;
+            padding: 22px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+        .modal-title { font-size: 16px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        .modal-body { display: flex; flex-direction: column; gap: 14px; font-size: 14px; }
+        .checkbox-list { display: flex; flex-direction: column; gap: 10px; max-height: 220px; overflow-y: auto; border: 1px solid var(--border-color); padding: 12px; border-radius: 8px; background: var(--bg-card); }
+        .checkbox-item { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+
+        #toast {
+            position: fixed;
+            bottom: 30px; left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(20, 20, 20, 0.92);
+            color: #fff;
+            padding: 10px 24px;
+            border-radius: 24px;
+            font-size: 14px;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        #toast.show { opacity: 1; }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.75);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            color: white;
+            gap: 14px;
+        }
+        .spinner { width: 44px; height: 44px; border: 4px solid rgba(255,255,255,0.2); border-top-color: var(--accent-color); border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body data-theme="wood">
+
+<div id="loadingOverlay" class="loading-overlay" style="display: none;">
+    <div class="spinner"></div>
+    <div id="loadingText">読み込み中...</div>
+</div>
+
+<div id="bookshelf-view">
+    <header class="shelf-header">
+        <div class="shelf-title">
+            <span>📚</span> 自炊本リーダー <span class="ai-pill">タブレット AI版</span>
+        </div>
+        <div class="toolbar-group">
+            <input type="file" id="shelfFileInput" accept="application/pdf" multiple style="display: none;">
+            <button class="btn btn-primary" onclick="document.getElementById('shelfFileInput').click()">
+                ＋ 本を追加
+            </button>
+            <select id="shelfThemeSelect">
+                <option value="wood">🟤 ウッド</option>
+                <option value="dark">🌙 ダーク</option>
+                <option value="sepia">📖 セピア</option>
+                <option value="light">☀️ ライト</option>
+            </select>
+        </div>
+    </header>
+
+    <div class="collection-bar" id="collectionBar"></div>
+
+    <div class="shelf-container">
+        <div id="bookGrid" class="book-grid"></div>
+        <div id="emptyState" class="empty-state" style="display: none;">
+            <div class="empty-state-icon">📖</div>
+            <div id="emptyStateText" style="font-size: 16px; font-weight: 600;">本がありません</div>
+            <div style="font-size: 13px;">「＋ 本を追加」ボタンからPDFを選択してください。</div>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="assignModal">
+    <div class="modal-card">
+        <div class="modal-title">
+            <span>📁 コレクションを設定</span>
+            <button class="card-action-btn" onclick="closeAssignModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div id="assignBookTitle" style="font-weight: 600;"></div>
+            <div>所属させるコレクションを選択：</div>
+            <div class="checkbox-list" id="assignCheckboxList"></div>
+        </div>
+        <div class="modal-actions" style="display:flex; justify-content:flex-end; gap:8px;">
+            <button class="btn" onclick="closeAssignModal()">キャンセル</button>
+            <button class="btn btn-primary" onclick="saveAssignCollections()">保存</button>
+        </div>
+    </div>
+</div>
+
+<div id="reader-view">
+    <div class="toolbar" id="toolbar">
+        <div class="toolbar-group">
+            <button class="btn" id="btnBackToShelf">📚 本棚</button>
+            <span id="readerBookTitle"></span>
+        </div>
+
+        <div class="toolbar-group">
+            <button class="btn" id="btnToggleBookmark">🔖 しおり</button>
+            <button class="btn" id="btnListBookmarks">📑 一覧 (<span id="bookmarkCount">0</span>)</button>
+            <button class="btn btn-ai" id="btnOpenAI">🤖 AI 読書支援</button>
+
+            <select id="modeSelect">
+                <option value="rtl">右開き (縦書き小説)</option>
+                <option value="ltr">左開き (横書き書籍)</option>
+            </select>
+
+            <select id="readerThemeSelect">
+                <option value="wood">🟤 ウッド</option>
+                <option value="dark">🌙 ダーク</option>
+                <option value="sepia">📖 セピア</option>
+                <option value="light">☀️ ライト</option>
+            </select>
+        </div>
+
+        <div class="toolbar-group">
+            <button class="btn" id="btnPrev">◀ 前</button>
+            <span id="pageInfo">- / -</span>
+            <button class="btn" id="btnNext">次 ▶</button>
+            <button class="btn" id="btnFullscreen">⛶ 全画面</button>
+        </div>
+    </div>
+
+    <div id="viewer-container">
+        <div id="spread"></div>
+        <div class="click-zone" id="left-zone"></div>
+        <div class="click-zone" id="right-zone"></div>
+
+        <div id="bookmarkDrawer" class="side-drawer">
+            <div class="drawer-header">
+                <span>📑 挟んだしおり一覧</span>
+                <button class="card-action-btn" id="btnCloseBookmarkDrawer">✕</button>
+            </div>
+            <div class="drawer-content" id="bookmarkListContainer"></div>
+        </div>
+
+        <div id="aiDrawer" class="side-drawer">
+            <div class="drawer-header">
+                <span>🤖 AI 読書アシスタント</span>
+                <button class="card-action-btn" id="btnCloseAIDrawer">✕</button>
+            </div>
+            <div class="drawer-content">
+                <div class="ai-section-box">
+                    <div class="ai-section-title">
+                        <span>📖 主要エピソード（出来事の流れ）</span>
+                    </div>
+                    <div class="ai-toggle-group">
+                        <button class="ai-toggle-btn active" id="btnSummaryRecent" onclick="setSummaryRange('recent')">直前 (前回の栞〜現在)</button>
+                        <button class="ai-toggle-btn" id="btnSummaryTotal" onclick="setSummaryRange('total')">全体 (冒頭〜現在)</button>
+                    </div>
+                    <button class="btn btn-primary" id="btnGenerateSummary" style="font-size: 13px; justify-content: center;" onclick="generateSummaryAction()">
+                        ✨ エピソードを抽出・更新
+                    </button>
+                    <div class="ai-result-box" id="aiSummaryResult">「エピソードを抽出」を押すと、起きた出来事を表題付きで分かりやすく整理します。</div>
+                </div>
+
+                <div class="ai-section-box">
+                    <div class="ai-section-title">
+                        <span>👥 「この人誰だっけ？」人物メモ</span>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" id="aiCharacterInput" placeholder="人物名（例: 門番, 板倉勝静）" style="flex: 1; font-size: 13px;">
+                        <button class="btn btn-primary" style="font-size: 13px;" onclick="queryCharacterAction()">解説</button>
+                    </div>
+                    <div class="ai-result-box" id="aiCharacterResult">人物名を入力して「解説」を押すと、主人公との関係性や象徴的なエピソードをまとめて教えます。</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    const GEMINI_API_KEY = 'AQ.Ab8RN6JP-oM5a54UjwIpM8lLKu5v0gMk5XUePUMukE4wOZQxYw';
+
+    const DB_NAME = 'JisuiBookShelfDB';
+    const DB_VERSION = 1;
+    const STORE_NAME = 'books';
+    let db = null;
+
+    function openDB() {
+        return new Promise((resolve, reject) => {
+            const req = indexedDB.open(DB_NAME, DB_VERSION);
+            req.onupgradeneeded = (e) => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains(STORE_NAME)) {
+                    const store = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+                    store.createIndex('lastReadAt', 'lastReadAt', { unique: false });
+                }
+            };
+            req.onsuccess = (e) => {
+                db = e.target.result;
+                resolve(db);
+            };
+            req.onerror = (e) => reject(e);
+        });
+    }
+
+    function getAllBooks() {
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(STORE_NAME, 'readonly');
+            const store = tx.objectStore(STORE_NAME);
+            const req = store.getAll();
+            req.onsuccess = () => {
+                const list = req.result || [];
+                list.sort((a, b) => (b.lastReadAt || 0) - (a.lastReadAt || 0));
+                resolve(list);
+            };
+            req.onerror = (e) => reject(e);
+        });
+    }
+
+    function getBook(id) {
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(STORE_NAME, 'readonly');
+            const store = tx.objectStore(STORE_NAME);
+            const req = store.get(id);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = (e) => reject(e);
+        });
+    }
+
+    function saveBook(book) {
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(STORE_NAME, 'readwrite');
+            const store = tx.objectStore(STORE_NAME);
+            const req = store.put(book);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = (e) => reject(e);
+        });
+    }
+
+    function deleteBook(id) {
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(STORE_NAME, 'readwrite');
+            const store = tx.objectStore(STORE_NAME);
+            const req = store.delete(id);
+            req.onsuccess = () => resolve();
+            req.onerror = (e) => reject(e);
+        });
+    }
+
+    let collections = JSON.parse(localStorage.getItem('jisui_collections') || '["小説", "ミステリー", "ビジネス"]');
+    let currentCollection = localStorage.getItem('jisui_active_collection') || 'all';
+
+    function saveCollections() {
+        localStorage.setItem('jisui_collections', JSON.stringify(collections));
+    }
+
+    const bookshelfView = document.getElementById('bookshelf-view');
+    const readerView = document.getElementById('reader-view');
+    const bookGrid = document.getElementById('bookGrid');
+    const emptyState = document.getElementById('emptyState');
+    const emptyStateText = document.getElementById('emptyStateText');
+    const shelfFileInput = document.getElementById('shelfFileInput');
+    const collectionBar = document.getElementById('collectionBar');
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const loadingText = document.getElementById('loadingText');
+    const toast = document.getElementById('toast');
+
+    const shelfThemeSelect = document.getElementById('shelfThemeSelect');
+    const readerThemeSelect = document.getElementById('readerThemeSelect');
+    const modeSelect = document.getElementById('modeSelect');
+    const readerBookTitle = document.getElementById('readerBookTitle');
+    const btnBackToShelf = document.getElementById('btnBackToShelf');
+    const btnNext = document.getElementById('btnNext');
+    const btnPrev = document.getElementById('btnPrev');
+    const btnFullscreen = document.getElementById('btnFullscreen');
+    const pageInfo = document.getElementById('pageInfo');
+    const spread = document.getElementById('spread');
+    const leftZone = document.getElementById('left-zone');
+    const rightZone = document.getElementById('right-zone');
+
+    const btnToggleBookmark = document.getElementById('btnToggleBookmark');
+    const btnListBookmarks = document.getElementById('btnListBookmarks');
+    const bookmarkCount = document.getElementById('bookmarkCount');
+    const bookmarkDrawer = document.getElementById('bookmarkDrawer');
+    const btnCloseBookmarkDrawer = document.getElementById('btnCloseBookmarkDrawer');
+    const bookmarkListContainer = document.getElementById('bookmarkListContainer');
+
+    const btnOpenAI = document.getElementById('btnOpenAI');
+    const aiDrawer = document.getElementById('aiDrawer');
+    const btnCloseAIDrawer = document.getElementById('btnCloseAIDrawer');
+    const aiSummaryResult = document.getElementById('aiSummaryResult');
+    const aiCharacterInput = document.getElementById('aiCharacterInput');
+    const aiCharacterResult = document.getElementById('aiCharacterResult');
+    let activeSummaryRange = 'recent';
+
+    const assignModal = document.getElementById('assignModal');
+    const assignBookTitle = document.getElementById('assignBookTitle');
+    const assignCheckboxList = document.getElementById('assignCheckboxList');
+    let targetBookForAssign = null;
+
+    let currentBook = null;
+    let pdfDoc = null;
+    let pageNum = 1;
+    let mode = 'rtl';
+
+    function applyTheme(theme) {
+        document.body.setAttribute('data-theme', theme);
+        shelfThemeSelect.value = theme;
+        readerThemeSelect.value = theme;
+        localStorage.setItem('reader_theme', theme);
+    }
+    const savedTheme = localStorage.getItem('reader_theme') || 'wood';
+    applyTheme(savedTheme);
+
+    shelfThemeSelect.addEventListener('change', (e) => applyTheme(e.target.value));
+    readerThemeSelect.addEventListener('change', (e) => applyTheme(e.target.value));
+
+    function showToast(msg) {
+        toast.textContent = msg;
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+
+    function resetAIPanel() {
+        aiCharacterInput.value = '';
+        aiCharacterResult.textContent = '人物名を入力して「解説」を押すと、主人公との関係性や象徴的なエピソードをまとめて教えます。';
+        activeSummaryRange = 'recent';
+        document.getElementById('btnSummaryRecent').classList.add('active');
+        document.getElementById('btnSummaryTotal').classList.remove('active');
+        aiSummaryResult.textContent = '「エピソードを抽出」を押すと、起きた出来事を表題付きで分かりやすく整理します。';
+    }
+
+    async function renderCollectionTabs(allBooks) {
+        collectionBar.innerHTML = '';
+
+        const allTab = document.createElement('div');
+        allTab.className = `collection-tab ${currentCollection === 'all' ? 'active' : ''}`;
+        allTab.innerHTML = `<span>📚 すべて</span> <span>(${allBooks.length})</span>`;
+        allTab.addEventListener('click', () => {
+            currentCollection = 'all';
+            localStorage.setItem('jisui_active_collection', 'all');
+            renderCollectionTabs(allBooks);
+            renderBookGrid(allBooks);
+        });
+        collectionBar.appendChild(allTab);
+
+        collections.forEach(colName => {
+            const count = allBooks.filter(b => (b.collections || []).includes(colName)).length;
+            const tab = document.createElement('div');
+            tab.className = `collection-tab ${currentCollection === colName ? 'active' : ''}`;
+            tab.innerHTML = `<span>📁 ${colName}</span> <span>(${count})</span>`;
+            
+            tab.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                if (confirm(`コレクション「${colName}」を削除しますか？\n（※本自体は削除されません）`)) {
+                    collections = collections.filter(c => c !== colName);
+                    saveCollections();
+                    if (currentCollection === colName) currentCollection = 'all';
+                    renderCollectionTabs(allBooks);
+                    renderBookGrid(allBooks);
+                }
+            });
+
+            tab.addEventListener('click', () => {
+                currentCollection = colName;
+                localStorage.setItem('jisui_active_collection', colName);
+                renderCollectionTabs(allBooks);
+                renderBookGrid(allBooks);
+            });
+            collectionBar.appendChild(tab);
+        });
+
+        const addBtn = document.createElement('button');
+        addBtn.className = 'collection-tab btn-add-collection';
+        addBtn.innerHTML = `＋ 本棚・著者追加`;
+        addBtn.addEventListener('click', () => {
+            const name = prompt('新しいコレクション名を入力してください：');
+            if (name && name.trim()) {
+                const trimmed = name.trim();
+                if (!collections.includes(trimmed)) {
+                    collections.push(trimmed);
+                    saveCollections();
+                    currentCollection = trimmed;
+                    renderCollectionTabs(allBooks);
+                    renderBookGrid(allBooks);
+                    showToast(`「${trimmed}」を作成しました`);
+                }
+            }
+        });
+        collectionBar.appendChild(addBtn);
+    }
+
+    function renderBookGrid(allBooks) {
+        bookGrid.innerHTML = '';
+
+        let filteredBooks = allBooks;
+        if (currentCollection !== 'all') {
+            filteredBooks = allBooks.filter(b => (b.collections || []).includes(currentCollection));
+        }
+
+        if (filteredBooks.length === 0) {
+            emptyState.style.display = 'flex';
+            emptyStateText.textContent = currentCollection === 'all' ? '本棚に本がありません' : `「${currentCollection}」に本がありません`;
+            return;
+        }
+        emptyState.style.display = 'none';
+
+        filteredBooks.forEach((book) => {
+            const card = document.createElement('div');
+            card.className = 'book-card';
+
+            const progressPercent = book.totalPages ? Math.round((book.currentPage / book.totalPages) * 100) : 0;
+            const bookmarkNum = (book.bookmarks || []).length;
+
+            card.innerHTML = `
+                <div class="book-cover-wrap">
+                    ${book.coverData ? `<img src="${book.coverData}" alt="表紙">` : `<div class="book-cover-placeholder">📖</div>`}
+                </div>
+                <div class="book-info">
+                    <div class="book-title" title="${book.title}">${book.title}</div>
+                    <div class="book-progress-text">${book.currentPage} / ${book.totalPages}P (${progressPercent}%)</div>
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill" style="width: ${progressPercent}%;"></div>
+                    </div>
+                    <div class="card-actions">
+                        <button class="card-action-btn" onclick="event.stopPropagation(); openAssignModal(${book.id})">📁 整理</button>
+                        <span>🔖 ${bookmarkNum}</span>
+                        <button class="btn btn-danger" onclick="event.stopPropagation(); removeBook(${book.id}, '${book.title.replace(/'/g, "\\'")}')">削除</button>
+                    </div>
+                </div>
+            `;
+
+            card.addEventListener('click', () => openReader(book.id));
+            bookGrid.appendChild(card);
+        });
+    }
+
+    async function loadBookshelf() {
+        const books = await getAllBooks();
+        await renderCollectionTabs(books);
+        renderBookGrid(books);
+    }
+
+    window.openAssignModal = async function(bookId) {
+        targetBookForAssign = await getBook(bookId);
+        if (!targetBookForAssign) return;
+
+        assignBookTitle.textContent = targetBookForAssign.title;
+        assignCheckboxList.innerHTML = '';
+
+        if (collections.length === 0) {
+            assignCheckboxList.innerHTML = '<div style="color:var(--text-sub);">コレクションがありません。</div>';
+        } else {
+            const bookCols = targetBookForAssign.collections || [];
+            collections.forEach(col => {
+                const label = document.createElement('label');
+                label.className = 'checkbox-item';
+                label.innerHTML = `
+                    <input type="checkbox" value="${col}" ${bookCols.includes(col) ? 'checked' : ''}>
+                    <span>${col}</span>
+                `;
+                assignCheckboxList.appendChild(label);
+            });
+        }
+
+        assignModal.classList.add('open');
+    };
+
+    window.closeAssignModal = function() {
+        assignModal.classList.remove('open');
+        targetBookForAssign = null;
+    };
+
+    window.saveAssignCollections = async function() {
+        if (!targetBookForAssign) return;
+        const checked = Array.from(assignCheckboxList.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
+        targetBookForAssign.collections = checked;
+        await saveBook(targetBookForAssign);
+        closeAssignModal();
+        await loadBookshelf();
+        showToast('コレクションを更新しました');
+    };
+
+    shelfFileInput.addEventListener('change', async (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
+
+        loadingOverlay.style.display = 'flex';
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            loadingText.textContent = `取り込み中 (${i + 1}/${files.length}): ${file.name}`;
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const tempPdf = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
+                
+                let coverData = null;
+                try {
+                    const page1 = await tempPdf.getPage(1);
+                    const viewport = page1.getViewport({ scale: 0.5 });
+                    const canvas = document.createElement('canvas');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+                    const ctx = canvas.getContext('2d');
+                    await page1.render({ canvasContext: ctx, viewport }).promise;
+                    coverData = canvas.toDataURL('image/jpeg', 0.8);
+                } catch (err) {}
+
+                const title = file.name.replace(/\.pdf$/i, '');
+                const defaultCols = (currentCollection !== 'all') ? [currentCollection] : [];
+
+                const newBook = {
+                    title: title,
+                    fileName: file.name,
+                    fileData: arrayBuffer,
+                    coverData: coverData,
+                    totalPages: tempPdf.numPages,
+                    currentPage: 1,
+                    mode: 'rtl',
+                    bookmarks: [],
+                    collections: defaultCols,
+                    aiSummaries: {},
+                    aiCharacters: {},
+                    addedAt: Date.now(),
+                    lastReadAt: Date.now()
+                };
+
+                await saveBook(newBook);
+            } catch (err) {
+                alert(`「${file.name}」の読み込みに失敗しました。`);
+            }
+        }
+
+        shelfFileInput.value = '';
+        loadingOverlay.style.display = 'none';
+        await loadBookshelf();
+        showToast('本棚に本を追加しました');
+    });
+
+    window.removeBook = async function(id, title) {
+        if (confirm(`「${title}」を本棚から削除しますか？`)) {
+            await deleteBook(id);
+            await loadBookshelf();
+            showToast('本棚から削除しました');
+        }
+    };
+
+    async function openReader(bookId) {
+        loadingOverlay.style.display = 'flex';
+        loadingText.textContent = '本を開いています...';
+
+        try {
+            currentBook = await getBook(bookId);
+            if (!currentBook) throw new Error("Book not found");
+            if (!currentBook.bookmarks) currentBook.bookmarks = [];
+            if (!currentBook.aiSummaries) currentBook.aiSummaries = {};
+            if (!currentBook.aiCharacters) currentBook.aiCharacters = {};
+
+            pdfDoc = await pdfjsLib.getDocument({ data: currentBook.fileData.slice(0) }).promise;
+            pageNum = currentBook.currentPage || 1;
+            mode = currentBook.mode || 'rtl';
+            modeSelect.value = mode;
+            readerBookTitle.textContent = currentBook.title;
+
+            resetAIPanel();
+
+            bookmarkDrawer.classList.remove('open');
+            aiDrawer.classList.remove('open');
+            bookshelfView.style.display = 'none';
+            readerView.style.display = 'flex';
+
+            renderSpread();
+            updateBookmarkUI();
+            updateAIDrawerCache();
+
+            if (pageNum > 1) {
+                showToast(`前回の続き（P.${pageNum}）から再開しました`);
+            }
+        } catch (err) {
+            alert("本を開けませんでした。");
+        } finally {
+            loadingOverlay.style.display = 'none';
+        }
+    }
+
+    btnBackToShelf.addEventListener('click', async () => {
+        if (document.fullscreenElement) {
+            document.exitFullscreen().catch(()=>{});
+        }
+        bookmarkDrawer.classList.remove('open');
+        aiDrawer.classList.remove('open');
+        resetAIPanel();
+        readerView.style.display = 'none';
+        bookshelfView.style.display = 'flex';
+        pdfDoc = null;
+        currentBook = null;
+        await loadBookshelf();
+    });
+
+    function getCurrentVisiblePages() {
+        if (pageNum === 1) return [1];
+        const p1 = pageNum;
+        const p2 = pageNum + 1 <= pdfDoc.numPages ? pageNum + 1 : null;
+        return p2 ? [p1, p2] : [p1];
+    }
+
+    function isCurrentSpreadBookmarked() {
+        if (!currentBook || !currentBook.bookmarks) return false;
+        const pages = getCurrentVisiblePages();
+        return currentBook.bookmarks.some(b => pages.includes(b.page));
+    }
+
+    function updateBookmarkUI() {
+        if (!currentBook) return;
+        const count = (currentBook.bookmarks || []).length;
+        bookmarkCount.textContent = count;
+
+        if (isCurrentSpreadBookmarked()) {
+            btnToggleBookmark.classList.add('btn-bookmark-active');
+            btnToggleBookmark.textContent = '🔖 しおり済み';
+        } else {
+            btnToggleBookmark.classList.remove('btn-bookmark-active');
+            btnToggleBookmark.textContent = '🔖 しおり';
+        }
+    }
+
+    btnToggleBookmark.addEventListener('click', async () => {
+        if (!currentBook) return;
+        if (!currentBook.bookmarks) currentBook.bookmarks = [];
+
+        const pages = getCurrentVisiblePages();
+        const existingIndex = currentBook.bookmarks.findIndex(b => pages.includes(b.page));
+
+        if (existingIndex >= 0) {
+            const removed = currentBook.bookmarks.splice(existingIndex, 1)[0];
+            await saveBook(currentBook);
+            updateBookmarkUI();
+            renderBookmarkList();
+            showToast(`P.${removed.page} のしおりを外しました`);
+        } else {
+            const targetPage = pageNum;
+            const now = new Date();
+            const dateStr = `${now.getMonth() + 1}/${now.getDate()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+            
+            currentBook.bookmarks.push({
+                page: targetPage,
+                date: dateStr,
+                timestamp: Date.now()
+            });
+
+            currentBook.bookmarks.sort((a, b) => a.page - b.page);
+            await saveBook(currentBook);
+            updateBookmarkUI();
+            renderBookmarkList();
+            showToast(`P.${targetPage} にしおりを挟みました`);
+        }
+    });
+
+    function renderBookmarkList() {
+        if (!currentBook) return;
+        bookmarkListContainer.innerHTML = '';
+
+        const bookmarks = currentBook.bookmarks || [];
+        if (bookmarks.length === 0) {
+            bookmarkListContainer.innerHTML = `
+                <div style="text-align:center; color:var(--text-sub); padding:40px 10px; font-size:14px; line-height:1.6;">
+                    しおりがありません。<br>
+                    ツールバーの「🔖 しおり」を押して気になるページを保存できます。
+                </div>
+            `;
+            return;
+        }
+
+        bookmarks.forEach((bm, index) => {
+            const item = document.createElement('div');
+            item.className = 'bookmark-item';
+            item.innerHTML = `
+                <div>
+                    <div class="bookmark-item-title">📖 P.${bm.page}</div>
+                    <div class="bookmark-item-date">${bm.date}</div>
+                </div>
+                <button class="btn btn-danger" onclick="event.stopPropagation(); deleteBookmark(${index})">削除</button>
+            `;
+            item.addEventListener('click', () => {
+                jumpToPage(bm.page);
+                bookmarkDrawer.classList.remove('open');
+            });
+            bookmarkListContainer.appendChild(item);
+        });
+    }
+
+    window.deleteBookmark = async function(index) {
+        if (!currentBook || !currentBook.bookmarks) return;
+        const removed = currentBook.bookmarks.splice(index, 1)[0];
+        await saveBook(currentBook);
+        updateBookmarkUI();
+        renderBookmarkList();
+        showToast(`P.${removed.page} のしおりを削除しました`);
+    };
+
+    function jumpToPage(targetPage) {
+        if (!pdfDoc) return;
+        if (targetPage === 1) {
+            pageNum = 1;
+        } else {
+            pageNum = (targetPage % 2 === 0) ? targetPage : targetPage - 1;
+        }
+        renderSpread();
+        updateBookmarkUI();
+    }
+
+    btnListBookmarks.addEventListener('click', () => {
+        aiDrawer.classList.remove('open');
+        renderBookmarkList();
+        bookmarkDrawer.classList.toggle('open');
+    });
+
+    btnCloseBookmarkDrawer.addEventListener('click', () => {
+        bookmarkDrawer.classList.remove('open');
+    });
+
+    btnOpenAI.addEventListener('click', () => {
+        bookmarkDrawer.classList.remove('open');
+        updateAIDrawerCache();
+        aiDrawer.classList.toggle('open');
+    });
+
+    btnCloseAIDrawer.addEventListener('click', () => {
+        aiDrawer.classList.remove('open');
+    });
+
+    window.setSummaryRange = function(range) {
+        activeSummaryRange = range;
+        document.getElementById('btnSummaryRecent').classList.toggle('active', range === 'recent');
+        document.getElementById('btnSummaryTotal').classList.toggle('active', range === 'total');
+        updateAIDrawerCache();
+    };
+
+    function getSummaryKey() {
+        const currentPage = pageNum;
+        if (activeSummaryRange === 'total') {
+            return `total_episodes_p${currentPage}`;
+        } else {
+            const bms = (currentBook.bookmarks || []).filter(b => b.page < currentPage);
+            const prevPage = bms.length > 0 ? bms[bms.length - 1].page : (currentPage > 2 ? 2 : 1);
+            return `recent_episodes_p${prevPage}_to_p${currentPage}`;
+        }
+    }
+
+    function updateAIDrawerCache() {
+        if (!currentBook) return;
+        const key = getSummaryKey();
+        if (currentBook.aiSummaries && currentBook.aiSummaries[key]) {
+            aiSummaryResult.textContent = currentBook.aiSummaries[key];
+        } else {
+            aiSummaryResult.textContent = activeSummaryRange === 'recent' 
+                ? '「エピソードを抽出」を押すと、直前のしおり位置から現在までの出来事を整理して表示します。'
+                : '「エピソードを抽出」を押すと、冒頭から現在までの主な出来事を整理して表示します。';
+        }
+    }
+
+    async function extractPageImagesForAI(startPage, endPage, maxSamplePages = 8) {
+        const actualStart = (startPage === 1 && endPage > 1) ? 2 : startPage;
+        const total = endPage - actualStart + 1;
+        let targetPages = [];
+
+        if (total <= maxSamplePages) {
+            for (let p = actualStart; p <= endPage; p++) targetPages.push(p);
+        } else {
+            const step = total / maxSamplePages;
+            for (let i = 0; i < maxSamplePages; i++) {
+                targetPages.push(Math.min(endPage, Math.round(actualStart + i * step)));
+            }
+            targetPages = Array.from(new Set(targetPages));
+        }
+
+        const imageParts = [];
+        for (const pNum of targetPages) {
+            try {
+                const page = await pdfDoc.getPage(pNum);
+                const viewport = page.getViewport({ scale: 0.8 });
+                const canvas = document.createElement('canvas');
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                const ctx = canvas.getContext('2d');
+                await page.render({ canvasContext: ctx, viewport }).promise;
+                
+                const base64 = canvas.toDataURL('image/jpeg', 0.6).split(',')[1];
+                imageParts.push({
+                    inlineData: {
+                        mimeType: "image/jpeg",
+                        data: base64
+                    }
+                });
+            } catch (err) {}
+        }
+        return imageParts;
+    }
+
+    function cleanEpisodeResponse(rawText, headerPrefix) {
+        if (!rawText) return "解析結果を取得できませんでした。";
+
+        let text = rawText.replace(/\*\*/g, '').trim();
+        const lines = text.split('\n');
+        const formattedBlocks = [];
+        let curBlock = [];
+        let count = 0;
+        const seenTitles = new Set();
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+
+            if (/^(Constraint|Image|Draft|Context|Characters|Key Plot|Refinement|Title|Content|Length|No spoilers|Final Version|Okay|\*|```)/i.test(line)) {
+                continue;
+            }
+
+            const m = line.match(/^(\d+)[\.\s、\)]\s*(.+)$/);
+            if (m) {
+                let title = m[2].replace(/\([A-Za-z0-9\s"'\.,\-_–—]+\)/g, '').trim();
+                const jpCount = (title.match(/[\u3040-\u309F\u4E00-\u9FAF]/g) || []).length;
+
+                if (jpCount >= 2 && !/^(Cover|P\.\d+|Image)/i.test(title)) {
+                    if (seenTitles.has(title.substring(0, 8))) break;
+
+                    if (curBlock.length > 0) {
+                        formattedBlocks.push(curBlock.join('\n\n'));
+                        curBlock = [];
+                    }
+
+                    count++;
+                    seenTitles.add(title.substring(0, 8));
+                    curBlock.push(`${count}. ${title}`);
+                    continue;
+                }
+            }
+
+            if (count > 0) {
+                const jpCount = (line.match(/[\u3040-\u309F\u4E00-\u9FAF]/g) || []).length;
+                if (jpCount >= 4 && !/^\d+[\.\s]/.test(line)) {
+                    curBlock.push(line);
+                }
+            }
+        }
+
+        if (curBlock.length > 0) {
+            formattedBlocks.push(curBlock.join('\n\n'));
+        }
+
+        if (formattedBlocks.length > 0) {
+            return headerPrefix + '\n\n' + formattedBlocks.join('\n\n');
+        }
+
+        return headerPrefix + '\n\n' + text;
+    }
+
+    function cleanCharacterResponse(rawText, headerPrefix) {
+        if (!rawText) return "解説を取得できませんでした。";
+
+        let text = rawText.replace(/\*\*/g, '').trim();
+        const lines = text.split('\n');
+        const validLines = [];
+        const seenWords = new Set();
+
+        for (const rawLine of lines) {
+            let line = rawLine.trim();
+            if (!line) continue;
+
+            if (/^(Constraint|Image|Draft|Context|Characters|Key Plot|Refinement|Title|Content|Length|No spoilers|Final Version|Okay|\*|```)/i.test(line)) {
+                continue;
+            }
+            if (/^["'「].*["'」]$/.test(line) && line.length < 50) {
+                continue;
+            }
+
+            line = line.replace(/^[・\-\s]+/, '');
+            const jpCount = (line.match(/[\u3040-\u309F\u4E00-\u9FAF]/g) || []).length;
+            if (jpCount >= 6 && !line.startsWith('【')) {
+                const startWord = line.substring(0, 10);
+                if (!seenWords.has(startWord)) {
+                    seenWords.add(startWord);
+                    validLines.push(line);
+                }
+            }
+        }
+
+        if (validLines.length > 0) {
+            return headerPrefix + '\n\n' + validLines.slice(0, 3).join('\n\n');
+        }
+
+        return headerPrefix + '\n\n' + text;
+    }
+
+    async function callGeminiVision(parts) {
+        let candidateModels = [];
+
+        try {
+            const mRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`);
+            if (mRes.ok) {
+                const mData = await mRes.json();
+                if (mData && mData.models) {
+                    candidateModels = mData.models.filter(m => 
+                        m.supportedGenerationMethods && 
+                        m.supportedGenerationMethods.includes('generateContent') && 
+                        !m.name.includes('embedding')
+                    );
+                }
+            }
+        } catch (e) {}
+
+        if (candidateModels.length === 0) {
+            candidateModels = [
+                { name: 'models/gemini-1.5-flash' },
+                { name: 'models/gemini-2.0-flash' },
+                { name: 'models/gemini-1.5-pro' }
+            ];
+        }
+
+        for (const model of candidateModels) {
+            try {
+                const endpointName = model.name.startsWith('models/') ? model.name : `models/${model.name}`;
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/${endpointName}:generateContent?key=${GEMINI_API_KEY}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts }] })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    const result = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (result) return result;
+                }
+            } catch(e) {
+                continue;
+            }
+        }
+        throw new Error('Gemini APIでの通信に失敗しました。時間をおいて再試行してください。');
+    }
+
+    window.generateSummaryAction = async function() {
+        if (!pdfDoc || !currentBook) return;
+
+        const currentPage = pageNum;
+        let startPage = 1;
+        if (activeScope === 'recent') {
+            const bms = (currentBook.bookmarks || []).filter(b => b.page < currentPage);
+            startPage = bms.length > 0 ? bms[bms.length - 1].page : (currentPage > 2 ? 2 : 1);
+        }
+
+        aiSummaryResult.textContent = `P.${startPage} 〜 P.${currentPage} を探索中... ⏳`;
+        const btn = document.getElementById('btnGenerateSummary');
+        btn.disabled = true;
+
+        try {
+            const imageParts = await extractPageImagesForAI(startPage, currentPage, 6);
+            if (imageParts.length === 0) throw new Error("ページの読み込みに失敗しました。");
+
+            const promptText = `添付された本文ページ画像（P.${startPage}〜P.${currentPage}）を読み取り、この範囲の中で起きた「重要で象徴的なエピソード」を時系列順に【日本語の表題をつけて最大5〜8個】提示してください。
+
+【出力形式】
+1. 表題（見出し）
+出来事の具体的な経緯、登場人物の行動や心理、起きた結果を説明した2〜3行の日本語の解説文。
+
+2. 表題（見出し）
+解説文。
+
+【厳格な指示】
+1. 英語の思考メモ、英語の要約、英語の見出し、英語の翻訳は一切出力しないでください。
+2. 表題・解説ともに【純粋な日本語のみ】で出力してください。
+3. 同じ文章やエピソードを繰り返して出力しないでください。
+4. ネタバレは一切書かないでください。`;
+
+            const parts = [{ text: promptText }, ...imageParts];
+            const rawResult = await callGeminiVision(parts);
+            const resultText = cleanEpisodeResponse(rawResult, `【P.${startPage}〜P.${currentPage} の主要エピソード】`);
+
+            const key = getSummaryKey();
+            if (!currentBook.aiSummaries) currentBook.aiSummaries = {};
+            currentBook.aiSummaries[key] = resultText;
+            await saveBook(currentBook);
+
+            aiSummaryResult.textContent = resultText;
+            showToast('主要エピソードを更新しました');
+        } catch (err) {
+            aiSummaryResult.textContent = `❌ エラー: ${err.message}`;
+        } finally {
+            btn.disabled = false;
+        }
+    };
+
+    window.queryCharacterAction = async function() {
+        const charName = aiCharacterInput.value.trim();
+        if (!charName) {
+            alert('人物名を入力してください。');
+            return;
+        }
+        if (!pdfDoc || !currentBook) return;
+
+        const currentPage = pageNum;
+        const cacheKey = `${charName}_p${currentPage}`;
+
+        aiCharacterResult.textContent = `P.1〜P.${currentPage} を探索して「${charName}」の情報を整理中... ⏳`;
+
+        try {
+            const bookTitle = currentBook.title || '小説・書籍';
+            const imageParts = await extractPageImagesForAI(1, currentPage, 8);
+
+            const promptText = `あなたは小説読書アシスタントです。
+作品名：『${bookTitle}』
+調査対象の人物名：『${charName}』
+現在の読書位置：P.${currentPage}まで
+
+添付された本文画像（P.1〜P.${currentPage}の抜粋）および作品設定をもとに、この人物「${charName}」の文中での主人公との関係性や、この人物の象徴的なエピソード・行動をまとめて簡潔に記載してください。
+
+【厳格な指示】
+1. 主人公との関係性、および作中で印象的な出来事や行動・役割がひと目でわかるように、2〜4行程度の自然な日本語でまとめてください。
+2. 本文の長文引用や同じ内容の言い換えの繰り返しは一切禁止します。
+3. ネタバレは一切書かないでください。
+4. 英語の思考メモや挨拶は含めず、日本語の解説文のみを出力してください。`;
+
+            const parts = [{ text: promptText }, ...imageParts];
+            const rawResult = await callGeminiVision(parts);
+            const resultText = cleanCharacterResponse(rawResult, `【${charName} について】`);
+
+            if (!currentBook.aiCharacters) currentBook.aiCharacters = {};
+            currentBook.aiCharacters[cacheKey] = resultText;
+            await saveBook(currentBook);
+
+            aiCharacterResult.textContent = resultText;
+            showToast('人物解説を取得・保存しました');
+        } catch (err) {
+            aiCharacterResult.textContent = `❌ エラー: ${err.message}`;
+        }
+    };
+
+    modeSelect.addEventListener('change', (e) => {
+        mode = e.target.value;
+        if (currentBook) {
+            currentBook.mode = mode;
+            saveBook(currentBook);
+        }
+        if (pdfDoc) renderSpread();
+    });
+
+    async function getRenderedCanvas(num, targetHeight) {
+        if (num < 1 || num > pdfDoc.numPages) return null;
+        const page = await pdfDoc.getPage(num);
+        const unscaledViewport = page.getViewport({ scale: 1.0 });
+        const scale = targetHeight / unscaledViewport.height;
+        const viewport = page.getViewport({ scale: scale });
+
+        const canvas = document.createElement('canvas');
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        const ctx = canvas.getContext('2d');
+        await page.render({ canvasContext: ctx, viewport }).promise;
+        return canvas;
+    }
+
+    async function renderSpread() {
+        if (!pdfDoc) return;
+        spread.innerHTML = '';
+
+        const containerHeight = document.getElementById('viewer-container').clientHeight - 16;
+
+        if (pageNum === 1) {
+            pageInfo.textContent = `1 / ${pdfDoc.numPages}`;
+            const canvas = await getRenderedCanvas(1, containerHeight);
+            if (canvas) spread.appendChild(canvas);
+        } else {
+            const p1 = pageNum;
+            const p2 = pageNum + 1 <= pdfDoc.numPages ? pageNum + 1 : null;
+            pageInfo.textContent = p2 ? `${p1}-${p2} / ${pdfDoc.numPages}` : `${p1} / ${pdfDoc.numPages}`;
+
+            let leftPageNum, rightPageNum;
+            if (mode === 'rtl') {
+                leftPageNum = p2;
+                rightPageNum = p1;
+            } else {
+                leftPageNum = p1;
+                rightPageNum = p2;
+            }
+
+            const leftCanvas = leftPageNum ? await getRenderedCanvas(leftPageNum, containerHeight) : null;
+            const rightCanvas = rightPageNum ? await getRenderedCanvas(rightPageNum, containerHeight) : null;
+
+            if (leftCanvas) spread.appendChild(leftCanvas);
+            if (rightCanvas) spread.appendChild(rightCanvas);
+        }
+
+        if (currentBook) {
+            currentBook.currentPage = pageNum;
+            currentBook.lastReadAt = Date.now();
+            saveBook(currentBook);
+        }
+        updateBookmarkUI();
+        updateAIDrawerCache();
+    }
+
+    function nextPage() {
+        if (!pdfDoc) return;
+        if (pageNum === 1) {
+            if (pdfDoc.numPages >= 2) pageNum = 2;
+        } else {
+            if (pageNum + 2 <= pdfDoc.numPages) {
+                pageNum += 2;
+            } else if (pageNum + 1 <= pdfDoc.numPages) {
+                pageNum += 2;
+            }
+        }
+        renderSpread();
+    }
+
+    function prevPage() {
+        if (!pdfDoc) return;
+        if (pageNum === 2) {
+            pageNum = 1;
+        } else if (pageNum > 2) {
+            pageNum -= 2;
+        }
+        renderSpread();
+    }
+
+    btnNext.addEventListener('click', nextPage);
+    btnPrev.addEventListener('click', prevPage);
+
+    leftZone.addEventListener('click', () => {
+        if (mode === 'rtl') nextPage();
+        else prevPage();
+    });
+
+    rightZone.addEventListener('click', () => {
+        if (mode === 'rtl') prevPage();
+        else nextPage();
+    });
+
+    function toggleFullscreen() {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(err => {});
+        } else {
+            if (document.exitFullscreen) document.exitFullscreen();
+        }
+    }
+
+    btnFullscreen.addEventListener('click', toggleFullscreen);
+
+    document.addEventListener('fullscreenchange', () => {
+        if (document.fullscreenElement) {
+            document.body.classList.add('fullscreen-mode');
+            btnFullscreen.textContent = '✖ 戻す';
+        } else {
+            document.body.classList.remove('fullscreen-mode');
+            btnFullscreen.textContent = '⛶ 全画面';
+        }
+        setTimeout(() => {
+            if (pdfDoc) renderSpread();
+        }, 100);
+    });
+
+    window.addEventListener('resize', () => {
+        if (pdfDoc && readerView.style.display === 'flex') {
+            renderSpread();
+        }
+    });
+
+    openDB().then(() => {
+        loadBookshelf();
+    }).catch(err => {
+        alert("データベースの初期化に失敗しました。");
+    });
+</script>
+</body>
+</html>

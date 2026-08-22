@@ -674,6 +674,15 @@
         setTimeout(() => toast.classList.remove('show'), 3000);
     }
 
+    function resetAIPanel() {
+        aiCharacterInput.value = '';
+        aiCharacterResult.textContent = '人物名を入力して「解説」を押すと、作中での立場や主人公との関係性を簡潔に教えます。';
+        activeSummaryRange = 'recent';
+        document.getElementById('btnSummaryRecent').classList.add('active');
+        document.getElementById('btnSummaryTotal').classList.remove('active');
+        aiSummaryResult.textContent = '「あらすじを生成」を押すと、ネタバレなしでここまでの流れを3〜5行で要約します。';
+    }
+
     async function renderCollectionTabs(allBooks) {
         collectionBar.innerHTML = '';
 
@@ -906,12 +915,8 @@
             modeSelect.value = mode;
             readerBookTitle.textContent = currentBook.title;
 
-            // 前回の本の残りを完全リセット
-            aiCharacterInput.value = '';
-            aiCharacterResult.textContent = '人物名を入力して「解説」を押すと、作中での立場や主人公との関係性を簡潔に教えます。';
-            activeSummaryRange = 'recent';
-            document.getElementById('btnSummaryRecent').classList.add('active');
-            document.getElementById('btnSummaryTotal').classList.remove('active');
+            // AIパネルの入力と表示を初期化
+            resetAIPanel();
 
             bookmarkDrawer.classList.remove('open');
             aiDrawer.classList.remove('open');
@@ -938,6 +943,7 @@
         }
         bookmarkDrawer.classList.remove('open');
         aiDrawer.classList.remove('open');
+        resetAIPanel();
         readerView.style.display = 'none';
         bookshelfView.style.display = 'flex';
         pdfDoc = null;

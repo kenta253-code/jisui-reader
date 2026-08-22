@@ -915,7 +915,6 @@
             modeSelect.value = mode;
             readerBookTitle.textContent = currentBook.title;
 
-            // AIパネルの入力と表示を初期化
             resetAIPanel();
 
             bookmarkDrawer.classList.remove('open');
@@ -1154,28 +1153,33 @@
     function cleanAIResponse(rawText, fallbackPrefix = "") {
         if (!rawText) return "解析結果を取得できませんでした。";
 
-        const jsonMatch = rawText.match(/\{[\s\S]*"summary"[\s\S]*:[\s\S]*"([^"]+)"[\s\S]*\}/);
-        if (jsonMatch && jsonMatch[1]) {
-            return jsonMatch[1].replace(/\\n/g, '\n').trim();
-        }
-
         const lines = rawText.split('\n');
         const japaneseLines = [];
 
         for (const line of lines) {
-            const trimmed = line.trim();
+            let trimmed = line.trim();
             if (!trimmed) continue;
             
+            // 英語の見出しやメタデータ行を除外
             if (/^(Constraint|Image|Draft|Context|Characters|Key Plot|Refinement|Title|Content|Length|No spoilers|Final Version|\*)/i.test(trimmed)) {
                 continue;
             }
 
+            // 省略記号だけの行を排除
+            if (/^[・\-\s\.\…]+$/.test(trimmed)) {
+                continue;
+            }
+
+            // ひらがな・漢字を含む実質的な日本語行のみ抽出
             const jpMatch = trimmed.match(/[\u3040-\u309F\u4E00-\u9FAF]/g);
-            if (jpMatch && jpMatch.length >= 4) {
-                const cleaned = trimmed.replace(/^[\*\-\d\.\s【】]+/, '').trim();
-                if (cleaned) {
-                    // 箇条書き記号を付与して整形
-                    japaneseLines.push(cleaned.startsWith('・') ? cleaned : '・' + cleaned);
+            if (jpMatch && jpMatch.length >= 3) {
+                // 【】で囲まれたタイトル行は除外
+                if (/^【.*】$/.test(trimmed)) continue;
+
+                // 先頭の箇条書き記号を統一
+                trimmed = trimmed.replace(/^[\*\-\d\.\s]+/, '').trim();
+                if (trimmed) {
+                    japaneseLines.push(trimmed.startsWith('・') ? trimmed : '・' + trimmed);
                 }
             }
         }
@@ -1238,13 +1242,12 @@
             const imageParts = await extractPageImagesForAI(startPage, currentPage, 6);
             if (imageParts.length === 0) throw new Error("ページの読み込みに失敗しました。");
 
-            const promptText = `あなたは小説読書アシスタントです。添付された本文ページ画像（P.${startPage}〜P.${currentPage}）を読み取り、この範囲で起きた「主要な出来事・エピソード」を時系列順に3〜4つの箇条書きで抽出してください。
+            const promptText = `あなたは小説読書アシスタントです。添付された本文ページ画像（P.${startPage}〜P.${currentPage}）を読み取り、この範囲で実際に起きている「主要な出来事・エピソード」を具体的に3〜4行の日本語の箇条書き（行頭に・を付ける）で出力してください。
 
 【厳格な指示】
-1. 抽象的な要約文ではなく、「誰が・どこで・何をしたか」「何が起きたか」という具体的な出来事を箇条書き（・で始まる形式）で記述してください。
+1. 「...」や省略記号は絶対に使わず、具体的な人物名や起きた行動・事実を書いてください。
 2. P.${currentPage}より先の展開（ネタバレ）は絶対に含めないでください。
-3. 英語の思考プロセスは一切含めず、以下のJSON形式のみを出力してください。
-{"summary": "【P.${startPage}〜P.${currentPage} の主要エピソード】\\n・（出来事1）\\n・（出来事2）\\n・（出来事3）"}`;
+3. 英語の思考プロセスや挨拶は一切出力せず、日本語の箇条書き本文のみを出力してください。`;
 
             const parts = [{ text: promptText }, ...imageParts];
             const rawResult = await callGeminiVision(parts);
@@ -1297,8 +1300,7 @@
 1. P.${currentPage}までの範囲で作中に登場・言及されている「立場・職業・身分」「主人公との関係性」「どのような人物か」を2〜4行程度の自然な日本語で解説してください。
 2. もし画像内に直接の記述が少ない場合でも、「画像に見当たらない」等のメタ発言は絶対に書かず、作品のジャンル・時代背景・文脈から推測される役割を自然に説明してください。
 3. ネタバレは一切書かないでください。
-4. 英語の思考メモは含めず、以下のJSON形式のみを出力してください。
-{"summary": "ここに解説文"}`;
+4. 英語の思考メモは含めず、日本語の解説文のみを出力してください。`;
 
             const parts = [{ text: promptText }, ...imageParts];
             const rawResult = await callGeminiVision(parts);

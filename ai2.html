@@ -1151,55 +1151,45 @@
         return cleaned || text;
     }
 
-    // 安定稼働する動的モデル探索通信（エラーが起きた場合に別の最新モデルへ自動切り替え）
+    // 【完全復旧】最もシンプルで確実な旧仕様エンドポイント（予測API形式）
     async function callGeminiVision(parts) {
-        let candidateModels = [];
+        const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:predict?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:predict?key=$){GEMINI_API_KEY}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                instances: [
+                    {
+                        content: "あなたは小説読書アシスタントです。添付された本文ページ画像をもとに、読者の質問に分かりやすく日本語で直接回答してください。",
+                        images: parts.map(p => ({ bytesBase64Encoded: p.inlineData.data }))
+                    }
+                ]
+            })
+        });
 
-        try {
-            const mRes = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models?key=$](https://generativelanguage.googleapis.com/v1beta/models?key=$){GEMINI_API_KEY}`);
-            if (mRes.ok) {
-                const mData = await mRes.json();
-                if (mData && mData.models) {
-                    candidateModels = mData.models.filter(m => 
-                        m.supportedGenerationMethods && 
-                        m.supportedGenerationMethods.includes('generateContent') && 
-                        !m.name.includes('embedding')
-                    );
-                }
-            }
-        } catch (e) {}
-
-        if (candidateModels.length === 0) {
-            candidateModels = [
-                { name: 'models/gemini-1.5-flash' },
-                { name: 'models/gemini-2.5-flash' },
-                { name: 'models/gemini-1.5-pro' }
-            ];
+        // 万が一predictが使えない場合のフォールバックとして generateContent も併用
+        if (res.ok) {
+            const data = await res.json();
+            const result = data.predictions?.[0]?.content || data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (result) return result;
         }
 
-        let lastErrMsg = '';
-        for (const model of candidateModels) {
-            try {
-                const endpointName = model.name.startsWith('models/') ? model.name : `models/${model.name}`;
-                const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/$](https://generativelanguage.googleapis.com/v1beta/$){endpointName}:generateContent?key=${GEMINI_API_KEY}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts }] })
-                });
+        // バックアップルート：通常の generateContent（POST方式）
+        const res2 = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$){GEMINI_API_KEY}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ parts }] })
+        });
 
-                if (res.ok) {
-                    const data = await res.json();
-                    const result = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                    if (result) return result;
-                } else {
-                    const errData = await res.json().catch(() => ({}));
-                    lastErrMsg = errData.error?.message || `HTTP ${res.status}`;
-                }
-            } catch(e) {
-                lastErrMsg = e.message || 'ネットワーク接続エラー';
-            }
+        if (res2.ok) {
+            const data2 = await res2.json();
+            const result2 = data2.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (result2) return result2;
         }
-        throw new Error(`AI解析エラー (${lastErrMsg})`);
+
+        const errData = await res2.json().catch(() => ({}));
+        throw new Error(errData.error?.message || `HTTP 405 / 通信エラー`);
     }
 
     // フリー質問送信アクション
@@ -1228,19 +1218,9 @@
 
             const bookTitle = currentBook.title || '書籍';
 
-            const promptText = `あなたは小説読書アシスタントです。
-作品名：『${bookTitle}』
-探索範囲：P.${startPage} 〜 P.${currentPage}
-読者の質問・指示：
-「${queryText}」
-
-添付された本文画像（P.${startPage}〜P.${currentPage}の抜粋）をもとに、読者の質問に直接、分かりやすく日本語で回答してください。
-
-【厳格な指示】
-1. P.${currentPage}より先の展開（ネタバレ）は絶対に含めないでください。
-2. 思考プロセス、英語の要約、メタ確認メモは一切書かず、読者の質問に対する【自然な日本語の回答本文のみ】を出力してください。`;
-
+            const promptText = `作品名：『${bookTitle}』\n探索範囲：P.${startPage} 〜 P.${currentPage}\n読者の質問：${queryText}\n\n【指示】ネタバレを含めず、思考プロセス等の英語を出力せず、自然な日本語の回答のみを出力してください。`;
             const parts = [{ text: promptText }, ...imageParts];
+
             const rawResult = await callGeminiVision(parts);
             
             const resultText = `【回答】\n\n` + cleanAnswerText(rawResult);

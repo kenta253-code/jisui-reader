@@ -508,7 +508,7 @@
                     <button class="btn btn-primary" id="btnGenerateSummary" style="font-size: 12px; justify-content: center;" onclick="generateSummaryAction()">
                         ✨ エピソードを抽出・更新
                     </button>
-                    <div class="ai-result-box" id="aiSummaryResult">「エピソードを抽出」を押すと、重要エピソードを表題付きで整理して表示します。</div>
+                    <div class="ai-result-box" id="aiSummaryResult">「エピソードを抽出」を押すと、起きた出来事を箇条書きで分かりやすく整理します。</div>
                 </div>
 
                 <div class="ai-section-box">
@@ -680,7 +680,7 @@
         activeSummaryRange = 'recent';
         document.getElementById('btnSummaryRecent').classList.add('active');
         document.getElementById('btnSummaryTotal').classList.remove('active');
-        aiSummaryResult.textContent = '「エピソードを抽出」を押すと、重要エピソードを表題付きで整理して表示します。';
+        aiSummaryResult.textContent = '「エピソードを抽出」を押すと、起きた出来事を箇条書きで分かりやすく整理します。';
     }
 
     async function renderCollectionTabs(allBooks) {
@@ -1107,8 +1107,8 @@
             aiSummaryResult.textContent = currentBook.aiSummaries[key];
         } else {
             aiSummaryResult.textContent = activeSummaryRange === 'recent' 
-                ? '「エピソードを抽出」を押すと、直前のしおり位置から現在までの重要エピソードを表題付きで整理して表示します。'
-                : '「エピソードを抽出」を押すと、冒頭から現在までの主な重要エピソードを表題付きで整理して表示します。';
+                ? '「エピソードを抽出」を押すと、直前のしおり位置から現在までの出来事を箇条書きで整理します。'
+                : '「エピソードを抽出」を押すと、冒頭から現在までの主な出来事を箇条書きで整理します。';
         }
     }
 
@@ -1150,108 +1150,77 @@
         return imageParts;
     }
 
-    // 英語インデックスを排除し、完全な日本語エピソードブロックのみを抽出するパーサー
-    function parseAndFormatEpisodes(rawText, headerPrefix) {
+    function cleanAIResponse(rawText, fallbackPrefix = "") {
         if (!rawText) return "解析結果を取得できませんでした。";
 
-        let text = rawText.replace(/\*\*/g, '').replace(/```[a-z]*/gi, '').trim();
+        const lines = rawText.split('\n');
+        const japaneseLines = [];
 
-        const lines = text.split('\n');
-        const episodes = [];
-        let currentEp = null;
-        const seenTitles = new Set();
-
-        for (let i = 0; i < lines.length; i++) {
-            let line = lines[i].trim();
-            if (!line) continue;
-
-            if (/^(Constraint|Image|Draft|Context|Characters|Key Plot|Refinement|Title|Content|Length|No spoilers|Final Version|Okay|\*|\[|\{|\})/i.test(line)) {
+        for (const line of lines) {
+            let trimmed = line.trim();
+            if (!trimmed) continue;
+            
+            if (/^(Constraint|Image|Draft|Context|Characters|Key Plot|Refinement|Title|Content|Length|No spoilers|Final Version|\*)/i.test(trimmed)) {
                 continue;
             }
 
-            const match = line.match(/^(\d+)[\.\s、\)]\s*(.+)$/);
-            if (match) {
-                let title = match[2].trim();
-                title = title.replace(/\([A-Za-z0-9\s"'\.,\-_–—]+\)/g, '').replace(/（[A-Za-z0-9\s"'\.,\-_–—]+）/g, '').trim();
-
-                const jpCount = (title.match(/[\u3040-\u309F\u4E00-\u9FAF]/g) || []).length;
-                if (jpCount >= 2 && !/^(Cover|P\.\d+|Image)/i.test(title)) {
-                    const normalizedTitle = title.substring(0, 8);
-                    if (seenTitles.has(normalizedTitle)) {
-                        break;
-                    }
-
-                    if (currentEp && currentEp.detail.length > 0) {
-                        episodes.push(currentEp);
-                        seenTitles.add(currentEp.title.substring(0, 8));
-                    }
-
-                    currentEp = {
-                        title: title,
-                        detail: []
-                    };
-                    continue;
-                }
+            if (/^[・\-\s\.\…\(\)（）出来事\d]+$/.test(trimmed)) {
+                continue;
             }
 
-            if (currentEp) {
-                const jpCount = (line.match(/[\u3040-\u309F\u4E00-\u9FAF]/g) || []).length;
-                if (jpCount >= 4 && !/^\d+[\.\s]/.test(line)) {
-                    currentEp.detail.push(line);
+            const jpMatch = trimmed.match(/[\u3040-\u309F\u4E00-\u9FAF]/g);
+            if (jpMatch && jpMatch.length >= 4) {
+                if (/^【.*】$/.test(trimmed)) continue;
+
+                trimmed = trimmed.replace(/^[\*\-\d\.\s]+/, '').trim();
+                if (trimmed && !trimmed.includes('出来事1') && !trimmed.includes('出来事2')) {
+                    japaneseLines.push(trimmed.startsWith('・') ? trimmed : '・' + trimmed);
                 }
             }
         }
 
-        if (currentEp && currentEp.detail.length > 0 && !seenTitles.has(currentEp.title.substring(0, 8))) {
-            episodes.push(currentEp);
+        const limitedLines = japaneseLines.slice(0, 8);
+
+        if (limitedLines.length > 0) {
+            return (fallbackPrefix ? fallbackPrefix + "\n" : "") + limitedLines.join('\n');
         }
 
-        if (episodes.length > 0) {
-            const formatted = episodes.slice(0, 8).map((ep, idx) => {
-                return `${idx + 1}. ${ep.title}\n\n${ep.detail.join('\n')}`;
-            }).join('\n\n');
-            return headerPrefix + '\n\n' + formatted;
-        }
-
-        return headerPrefix + '\n\n' + text;
+        return rawText.trim();
     }
 
-    // 公式推奨 x-goog-api-key ヘッダー方式による安定通信
     async function callGeminiVision(parts) {
-        const models = [
-            'gemini-2.5-flash',
-            'gemini-1.5-flash',
-            'gemini-1.5-pro'
-        ];
+        const mRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`);
+        const mData = await mRes.json();
+        
+        if (!mData.models || mData.models.length === 0) {
+            throw new Error('利用可能なGeminiモデルが見つかりません。');
+        }
 
-        let lastErrMsg = '';
-        for (const model of models) {
+        const candidateModels = mData.models.filter(m => 
+            m.supportedGenerationMethods && 
+            m.supportedGenerationMethods.includes('generateContent') && 
+            !m.name.includes('embedding')
+        );
+
+        for (const model of candidateModels) {
             try {
-                const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/$](https://generativelanguage.googleapis.com/v1beta/models/$){model}:generateContent`, {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/${model.name}:generateContent?key=${GEMINI_API_KEY}`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'x-goog-api-key': GEMINI_API_KEY
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ contents: [{ parts }] })
                 });
-
                 if (res.ok) {
                     const data = await res.json();
-                    const result = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                    if (result) return result;
-                } else {
-                    const errData = await res.json().catch(() => ({}));
-                    lastErrMsg = errData.error?.message || `HTTP ${res.status}`;
+                    return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
                 }
             } catch(e) {
-                lastErrMsg = e.message || 'ネットワーク接続エラー';
+                continue;
             }
         }
-        throw new Error(`AI解析エラー (${lastErrMsg})`);
+        throw new Error('利用可能なGeminiモデルでの解析に失敗しました。');
     }
 
-    // エピソード抽出アクション
+    // 主要エピソード抽出アクション
     window.generateSummaryAction = async function() {
         if (!pdfDoc || !currentBook) return;
 
@@ -1262,7 +1231,7 @@
             startPage = bms.length > 0 ? bms[bms.length - 1].page : (currentPage > 2 ? 2 : 1);
         }
 
-        aiSummaryResult.textContent = `P.${startPage} 〜 P.${currentPage} を探索してエピソードを抽出中... ⏳`;
+        aiSummaryResult.textContent = `P.${startPage} 〜 P.${currentPage} を探索中... ⏳`;
         const btn = document.getElementById('btnGenerateSummary');
         btn.disabled = true;
 
@@ -1270,24 +1239,17 @@
             const imageParts = await extractPageImagesForAI(startPage, currentPage, 6);
             if (imageParts.length === 0) throw new Error("ページの読み込みに失敗しました。");
 
-            const promptText = `添付された本文ページ画像（P.${startPage}〜P.${currentPage}）を読み取り、この範囲の中で起きた「重要で象徴的なエピソード」を時系列順に【日本語の表題をつけて最大5〜8個】提示してください。
-
-【出力形式】
-1. 表題（見出し）
-出来事の具体的な経緯、登場人物の行動や心理、起きた結果を説明した2〜3行の日本語の解説文。
-
-2. 表題（見出し）
-解説文。
+            const promptText = `添付された本文ページ画像（P.${startPage}〜P.${currentPage}）を読み取り、この範囲で起きた主要な出来事・エピソードを、重要度に応じて【5つ〜最大8個程度】の箇条書き（行頭に・を付ける）で出力してください。
 
 【厳格な指示】
-1. 英語の思考メモ、英語の要約、英語の見出し、英語の翻訳（括弧内の英語）は一切出力しないでください。
-2. 表題・解説ともに【純粋な日本語のみ】で出力してください。
-3. 同じ文章やエピソードを繰り返して出力しないでください。
-4. ネタバレは一切書かないでください。`;
+1. 本文に書かれている具体的な人物名や起きた事実・行動を明確に記述してください。
+2. 8個を超える長すぎる出力は避け、重要な出来事に絞り込んでください。
+3. ネタバレは一切書かないでください。
+4. 英語の思考メモや挨拶は含めず、日本語の箇条書きのみを出力してください。`;
 
             const parts = [{ text: promptText }, ...imageParts];
             const rawResult = await callGeminiVision(parts);
-            const resultText = parseAndFormatEpisodes(rawResult, `【P.${startPage}〜P.${currentPage} の主要エピソード】`);
+            const resultText = cleanAIResponse(rawResult, `【P.${startPage}〜P.${currentPage} の主要エピソード】`);
 
             const key = getSummaryKey();
             if (!currentBook.aiSummaries) currentBook.aiSummaries = {};
@@ -1336,9 +1298,7 @@
 
             const parts = [{ text: promptText }, ...imageParts];
             const rawResult = await callGeminiVision(parts);
-            
-            let cleaned = rawResult.replace(/\*\*/g, '').replace(/```[a-z]*/gi, '').trim();
-            const resultText = `【${charName} について】\n\n${cleaned}`;
+            const resultText = cleanAIResponse(rawResult, `【${charName} について】`);
 
             if (!currentBook.aiCharacters) currentBook.aiCharacters = {};
             currentBook.aiCharacters[cacheKey] = resultText;

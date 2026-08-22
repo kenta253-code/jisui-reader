@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>自炊本リーダー [AI搭載版]</title>
+    <title>自炊本リーダー [AI v2版]</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🤖</text></svg>">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <style>
@@ -151,17 +151,17 @@
         .btn-danger { background-color: transparent; color: #ff5c5c; border: 1px solid rgba(255, 92, 92, 0.4); padding: 3px 6px; font-size: 11px; border-radius: 4px; }
         .btn-danger:hover { background-color: #ff5c5c; color: white; }
 
-        select, input[type="text"] {
+        select, input[type="text"], textarea {
             background-color: var(--btn-bg);
             color: var(--text-color);
             border: 1px solid var(--border-color);
             border-radius: 6px;
-            padding: 6px 10px;
+            padding: 8px 10px;
             font-size: 13px;
-            cursor: pointer;
             outline: none;
+            font-family: inherit;
         }
-        input[type="text"] { cursor: text; }
+        textarea { resize: vertical; min-height: 70px; line-height: 1.5; }
 
         #bookshelf-view {
             flex: 1;
@@ -274,7 +274,7 @@
         .side-drawer {
             position: absolute;
             top: 50px; right: 0; bottom: 0;
-            width: 360px;
+            width: 380px;
             background-color: var(--bg-modal);
             border-left: 1px solid var(--border-color);
             box-shadow: -4px 0 20px rgba(0,0,0,0.3);
@@ -311,18 +311,18 @@
             flex-direction: column;
             gap: 10px;
         }
-        .ai-section-title { font-size: 12px; font-weight: 700; color: var(--accent-color); display: flex; align-items: center; gap: 6px; }
+        .ai-section-title { font-size: 13px; font-weight: 700; color: var(--accent-color); display: flex; align-items: center; gap: 6px; }
         .ai-toggle-group { display: flex; background: rgba(0,0,0,0.2); border-radius: 6px; padding: 2px; gap: 4px; }
-        .ai-toggle-btn { flex: 1; padding: 5px; font-size: 11px; font-weight: 600; background: transparent; border: none; color: var(--text-sub); border-radius: 4px; cursor: pointer; }
+        .ai-toggle-btn { flex: 1; padding: 6px; font-size: 11.5px; font-weight: 600; background: transparent; border: none; color: var(--text-sub); border-radius: 4px; cursor: pointer; }
         .ai-toggle-btn.active { background: var(--accent-color); color: #fff; }
         .ai-result-box {
-            font-size: 12.5px;
-            line-height: 1.75;
+            font-size: 13px;
+            line-height: 1.8;
             color: var(--text-color);
             background: rgba(0,0,0,0.2);
             border-radius: 6px;
-            padding: 12px;
-            min-height: 60px;
+            padding: 14px;
+            min-height: 100px;
             white-space: pre-wrap;
             border: 1px solid var(--border-color);
         }
@@ -399,7 +399,7 @@
 <div id="bookshelf-view">
     <header class="shelf-header">
         <div class="shelf-title">
-            <span>📚</span> 自炊本リーダー <span class="ai-pill">AI 搭載版</span>
+            <span>📚</span> 自炊本リーダー <span class="ai-pill">AI v2</span>
         </div>
         <div class="toolbar-group">
             <input type="file" id="shelfFileInput" accept="application/pdf" multiple style="display: none;">
@@ -455,7 +455,7 @@
         <div class="toolbar-group">
             <button class="btn" id="btnToggleBookmark">🔖 しおり</button>
             <button class="btn" id="btnListBookmarks">📑 しおり (<span id="bookmarkCount">0</span>)</button>
-            <button class="btn btn-ai" id="btnOpenAI">🤖 AI アシスタント</button>
+            <button class="btn btn-ai" id="btnOpenAI">🤖 AI に質問する</button>
 
             <select id="modeSelect">
                 <option value="rtl">右開き (縦書き小説)</option>
@@ -499,27 +499,21 @@
             <div class="drawer-content">
                 <div class="ai-section-box">
                     <div class="ai-section-title">
-                        <span>📖 主要エピソード（出来事の流れ）</span>
+                        <span>🔍 探索する範囲</span>
                     </div>
                     <div class="ai-toggle-group">
-                        <button class="ai-toggle-btn active" id="btnSummaryRecent" onclick="setSummaryRange('recent')">直前 (前回の栞〜現在)</button>
-                        <button class="ai-toggle-btn" id="btnSummaryTotal" onclick="setSummaryRange('total')">全体 (冒頭〜現在)</button>
+                        <button class="ai-toggle-btn active" id="btnScopeRecent" onclick="setScope('recent')">直前 (前回の栞〜現在)</button>
+                        <button class="ai-toggle-btn" id="btnScopeTotal" onclick="setScope('total')">全体 (冒頭〜現在)</button>
                     </div>
-                    <button class="btn btn-primary" id="btnGenerateSummary" style="font-size: 12px; justify-content: center;" onclick="generateSummaryAction()">
-                        ✨ エピソードを抽出・更新
-                    </button>
-                    <div class="ai-result-box" id="aiSummaryResult">「エピソードを抽出」を押すと、起きた出来事を表題付きで分かりやすく整理します。</div>
-                </div>
 
-                <div class="ai-section-box">
-                    <div class="ai-section-title">
-                        <span>👥 「この人誰だっけ？」人物メモ</span>
+                    <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 4px;">
+                        <textarea id="aiQueryInput" placeholder="質問や指示を入力してください&#10;例：&#10;・〇〇って誰だっけ？主人公との関係は？&#10;・ここまでの重要な出来事を整理して&#10;・あの人物の行動の動機を教えて"></textarea>
+                        <button class="btn btn-primary" id="btnSendAIQuery" style="justify-content: center; font-size: 13px;" onclick="sendFreeQueryAction()">
+                            🤖 AIに質問する
+                        </button>
                     </div>
-                    <div style="display: flex; gap: 6px;">
-                        <input type="text" id="aiCharacterInput" placeholder="人物名（例: 門番, 板倉勝静）" style="flex: 1; font-size: 12px; padding: 6px 8px;">
-                        <button class="btn btn-primary" style="font-size: 12px;" onclick="queryCharacterAction()">解説</button>
-                    </div>
-                    <div class="ai-result-box" id="aiCharacterResult">人物名を入力して「解説」を押すと、主人公との関係性や象徴的なエピソードをまとめて教えます。</div>
+
+                    <div class="ai-result-box" id="aiQueryResult">質問を入力して「AIに質問する」を押すと、指定した範囲の本文をもとにAIが直接回答します。</div>
                 </div>
             </div>
         </div>
@@ -641,10 +635,9 @@
     const btnOpenAI = document.getElementById('btnOpenAI');
     const aiDrawer = document.getElementById('aiDrawer');
     const btnCloseAIDrawer = document.getElementById('btnCloseAIDrawer');
-    const aiSummaryResult = document.getElementById('aiSummaryResult');
-    const aiCharacterInput = document.getElementById('aiCharacterInput');
-    const aiCharacterResult = document.getElementById('aiCharacterResult');
-    let activeSummaryRange = 'recent';
+    const aiQueryInput = document.getElementById('aiQueryInput');
+    const aiQueryResult = document.getElementById('aiQueryResult');
+    let activeScope = 'recent';
 
     const assignModal = document.getElementById('assignModal');
     const assignBookTitle = document.getElementById('assignBookTitle');
@@ -675,12 +668,11 @@
     }
 
     function resetAIPanel() {
-        aiCharacterInput.value = '';
-        aiCharacterResult.textContent = '人物名を入力して「解説」を押すと、主人公との関係性や象徴的なエピソードをまとめて教えます。';
-        activeSummaryRange = 'recent';
-        document.getElementById('btnSummaryRecent').classList.add('active');
-        document.getElementById('btnSummaryTotal').classList.remove('active');
-        aiSummaryResult.textContent = '「エピソードを抽出」を押すと、起きた出来事を表題付きで分かりやすく整理します。';
+        aiQueryInput.value = '';
+        activeScope = 'recent';
+        document.getElementById('btnScopeRecent').classList.add('active');
+        document.getElementById('btnScopeTotal').classList.remove('active');
+        aiQueryResult.textContent = '質問を入力して「AIに質問する」を押すと、指定した範囲の本文をもとにAIが直接回答します。';
     }
 
     async function renderCollectionTabs(allBooks) {
@@ -906,8 +898,6 @@
             currentBook = await getBook(bookId);
             if (!currentBook) throw new Error("Book not found");
             if (!currentBook.bookmarks) currentBook.bookmarks = [];
-            if (!currentBook.aiSummaries) currentBook.aiSummaries = {};
-            if (!currentBook.aiCharacters) currentBook.aiCharacters = {};
 
             pdfDoc = await pdfjsLib.getDocument({ data: currentBook.fileData.slice(0) }).promise;
             pageNum = currentBook.currentPage || 1;
@@ -924,7 +914,6 @@
 
             renderSpread();
             updateBookmarkUI();
-            updateAIDrawerCache();
 
             if (pageNum > 1) {
                 showToast(`前回の続き（P.${pageNum}）から再開しました`);
@@ -1074,7 +1063,6 @@
 
     btnOpenAI.addEventListener('click', () => {
         bookmarkDrawer.classList.remove('open');
-        updateAIDrawerCache();
         aiDrawer.classList.toggle('open');
     });
 
@@ -1082,37 +1070,13 @@
         aiDrawer.classList.remove('open');
     });
 
-    window.setSummaryRange = function(range) {
-        activeSummaryRange = range;
-        document.getElementById('btnSummaryRecent').classList.toggle('active', range === 'recent');
-        document.getElementById('btnSummaryTotal').classList.toggle('active', range === 'total');
-        updateAIDrawerCache();
+    window.setScope = function(scope) {
+        activeScope = scope;
+        document.getElementById('btnScopeRecent').classList.toggle('active', scope === 'recent');
+        document.getElementById('btnScopeTotal').classList.toggle('active', scope === 'total');
     };
 
-    function getSummaryKey() {
-        const currentPage = pageNum;
-        if (activeSummaryRange === 'total') {
-            return `total_episodes_p${currentPage}`;
-        } else {
-            const bms = (currentBook.bookmarks || []).filter(b => b.page < currentPage);
-            const prevPage = bms.length > 0 ? bms[bms.length - 1].page : (currentPage > 2 ? 2 : 1);
-            return `recent_episodes_p${prevPage}_to_p${currentPage}`;
-        }
-    }
-
-    function updateAIDrawerCache() {
-        if (!currentBook) return;
-        const key = getSummaryKey();
-        if (currentBook.aiSummaries && currentBook.aiSummaries[key]) {
-            aiSummaryResult.textContent = currentBook.aiSummaries[key];
-        } else {
-            aiSummaryResult.textContent = activeSummaryRange === 'recent' 
-                ? '「エピソードを抽出」を押すと、直前のしおり位置から現在までの出来事を整理して表示します。'
-                : '「エピソードを抽出」を押すと、冒頭から現在までの主な出来事を整理して表示します。';
-        }
-    }
-
-    async function extractPageImagesForAI(startPage, endPage, maxSamplePages = 8) {
+    async function extractPageImagesForAI(startPage, endPage, maxSamplePages = 6) {
         const actualStart = (startPage === 1 && endPage > 1) ? 2 : startPage;
         const total = endPage - actualStart + 1;
         let targetPages = [];
@@ -1150,103 +1114,6 @@
         return imageParts;
     }
 
-    // エピソード抽出の整形処理
-    function cleanEpisodeResponse(rawText, headerPrefix) {
-        if (!rawText) return "解析結果を取得できませんでした。";
-
-        let text = rawText.replace(/\*\*/g, '').trim();
-        const lines = text.split('\n');
-        const formattedBlocks = [];
-        let curBlock = [];
-        let count = 0;
-        const seenTitles = new Set();
-
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i].trim();
-            if (!line) continue;
-
-            if (/^(Constraint|Image|Draft|Context|Characters|Key Plot|Refinement|Title|Content|Length|No spoilers|Final Version|Okay|\*|```)/i.test(line)) {
-                continue;
-            }
-
-            const m = line.match(/^(\d+)[\.\s、\)]\s*(.+)$/);
-            if (m) {
-                let title = m[2].replace(/\([A-Za-z0-9\s"'\.,\-_–—]+\)/g, '').trim();
-                const jpCount = (title.match(/[\u3040-\u309F\u4E00-\u9FAF]/g) || []).length;
-
-                if (jpCount >= 2 && !/^(Cover|P\.\d+|Image)/i.test(title)) {
-                    if (seenTitles.has(title.substring(0, 8))) break;
-
-                    if (curBlock.length > 0) {
-                        formattedBlocks.push(curBlock.join('\n\n'));
-                        curBlock = [];
-                    }
-
-                    count++;
-                    seenTitles.add(title.substring(0, 8));
-                    curBlock.push(`${count}. ${title}`);
-                    continue;
-                }
-            }
-
-            if (count > 0) {
-                const jpCount = (line.match(/[\u3040-\u309F\u4E00-\u9FAF]/g) || []).length;
-                if (jpCount >= 4 && !/^\d+[\.\s]/.test(line)) {
-                    curBlock.push(line);
-                }
-            }
-        }
-
-        if (curBlock.length > 0) {
-            formattedBlocks.push(curBlock.join('\n\n'));
-        }
-
-        if (formattedBlocks.length > 0) {
-            return headerPrefix + '\n\n' + formattedBlocks.join('\n\n');
-        }
-
-        return headerPrefix + '\n\n' + text;
-    }
-
-    // 人物解説の整形処理（関係性とエピソードを綺麗に1つのまとまりに整理）
-    function cleanCharacterResponse(rawText, headerPrefix) {
-        if (!rawText) return "解説を取得できませんでした。";
-
-        let text = rawText.replace(/\*\*/g, '').trim();
-        const lines = text.split('\n');
-        const validLines = [];
-        const seenWords = new Set();
-
-        for (const rawLine of lines) {
-            let line = rawLine.trim();
-            if (!line) continue;
-
-            if (/^(Constraint|Image|Draft|Context|Characters|Key Plot|Refinement|Title|Content|Length|No spoilers|Final Version|Okay|\*|```)/i.test(line)) {
-                continue;
-            }
-            if (/^["'「].*["'」]$/.test(line) && line.length < 50) {
-                continue;
-            }
-
-            line = line.replace(/^[・\-\s]+/, '');
-            const jpCount = (line.match(/[\u3040-\u309F\u4E00-\u9FAF]/g) || []).length;
-            if (jpCount >= 6 && !line.startsWith('【')) {
-                const startWord = line.substring(0, 10);
-                if (!seenWords.has(startWord)) {
-                    seenWords.add(startWord);
-                    validLines.push(line);
-                }
-            }
-        }
-
-        if (validLines.length > 0) {
-            return headerPrefix + '\n\n' + validLines.slice(0, 3).join('\n\n');
-        }
-
-        return headerPrefix + '\n\n' + text;
-    }
-
-    // 動的モデル検出による安定通信
     async function callGeminiVision(parts) {
         let candidateModels = [];
 
@@ -1289,104 +1156,57 @@
                 continue;
             }
         }
-        throw new Error('Gemini APIでの解析に失敗しました。時間をおいて再試行してください。');
+        throw new Error('Gemini APIとの通信に失敗しました。時間をおいて再試行してください。');
     }
 
-    // 主要エピソード抽出アクション
-    window.generateSummaryAction = async function() {
+    // フリー質問送信アクション
+    window.sendFreeQueryAction = async function() {
+        const queryText = aiQueryInput.value.trim();
+        if (!queryText) {
+            alert('質問を入力してください。');
+            return;
+        }
         if (!pdfDoc || !currentBook) return;
 
         const currentPage = pageNum;
         let startPage = 1;
-        if (activeSummaryRange === 'recent') {
+        if (activeScope === 'recent') {
             const bms = (currentBook.bookmarks || []).filter(b => b.page < currentPage);
             startPage = bms.length > 0 ? bms[bms.length - 1].page : (currentPage > 2 ? 2 : 1);
         }
 
-        aiSummaryResult.textContent = `P.${startPage} 〜 P.${currentPage} を探索中... ⏳`;
-        const btn = document.getElementById('btnGenerateSummary');
+        aiQueryResult.textContent = `P.${startPage} 〜 P.${currentPage} を探索して回答を生成中... ⏳`;
+        const btn = document.getElementById('btnSendAIQuery');
         btn.disabled = true;
 
         try {
             const imageParts = await extractPageImagesForAI(startPage, currentPage, 6);
             if (imageParts.length === 0) throw new Error("ページの読み込みに失敗しました。");
 
-            const promptText = `添付された本文ページ画像（P.${startPage}〜P.${currentPage}）を読み取り、この範囲の中で起きた「重要で象徴的なエピソード」を時系列順に【日本語の表題をつけて最大5〜8個】提示してください。
-
-【出力形式】
-1. 表題（見出し）
-出来事の具体的な経緯、登場人物の行動や心理、起きた結果を説明した2〜3行の日本語の解説文。
-
-2. 表題（見出し）
-解説文。
-
-【厳格な指示】
-1. 英語の思考メモ、英語の要約、英語の見出し、英語の翻訳（括弧内の英語）は一切出力しないでください。
-2. 表題・解説ともに【純粋な日本語のみ】で出力してください。
-3. 同じ文章やエピソードを繰り返して出力しないでください。
-4. ネタバレは一切書かないでください。`;
-
-            const parts = [{ text: promptText }, ...imageParts];
-            const rawResult = await callGeminiVision(parts);
-            const resultText = cleanEpisodeResponse(rawResult, `【P.${startPage}〜P.${currentPage} の主要エピソード】`);
-
-            const key = getSummaryKey();
-            if (!currentBook.aiSummaries) currentBook.aiSummaries = {};
-            currentBook.aiSummaries[key] = resultText;
-            await saveBook(currentBook);
-
-            aiSummaryResult.textContent = resultText;
-            showToast('主要エピソードを更新しました');
-        } catch (err) {
-            aiSummaryResult.textContent = `❌ エラー: ${err.message}`;
-        } finally {
-            btn.disabled = false;
-        }
-    };
-
-    // 人物解説アクション（ご指定のプロンプト形式を適用）
-    window.queryCharacterAction = async function() {
-        const charName = aiCharacterInput.value.trim();
-        if (!charName) {
-            alert('人物名を入力してください。');
-            return;
-        }
-        if (!pdfDoc || !currentBook) return;
-
-        const currentPage = pageNum;
-        const cacheKey = `${charName}_p${currentPage}`;
-
-        aiCharacterResult.textContent = `P.1〜P.${currentPage} を探索して「${charName}」の情報を整理中... ⏳`;
-
-        try {
-            const bookTitle = currentBook.title || '小説・書籍';
-            const imageParts = await extractPageImagesForAI(1, currentPage, 8);
+            const bookTitle = currentBook.title || '書籍';
 
             const promptText = `あなたは小説読書アシスタントです。
 作品名：『${bookTitle}』
-調査対象の人物名：『${charName}』
-現在の読書位置：P.${currentPage}まで
+探索範囲：P.${startPage} 〜 P.${currentPage}
+読者の質問・指示：
+「${queryText}」
 
-添付された本文画像（P.1〜P.${currentPage}の抜粋）および作品設定をもとに、この人物「${charName}」の文中での主人公との関係性や、この人物の象徴的なエピソード・行動をまとめて簡潔に記載してください。
+添付された本文画像（P.${startPage}〜P.${currentPage}の抜粋）をもとに、読者の質問に直接、分かりやすく日本語で回答してください。
 
 【厳格な指示】
-1. 主人公との関係性、および作中で印象的な出来事や行動・役割がひと目でわかるように、2〜4行程度の自然な日本語でまとめてください。
-2. 本文の長文引用や同じ内容の言い換えの繰り返しは一切禁止します。
-3. ネタバレは一切書かないでください。
-4. 英語の思考メモや挨拶は含めず、日本語の解説文のみを出力してください。`;
+1. P.${currentPage}より先の展開（ネタバレ）は絶対に含めないでください。
+2. 英語の思考メモや挨拶は含めず、読者の疑問に答える日本語の回答本文のみを出力してください。`;
 
             const parts = [{ text: promptText }, ...imageParts];
             const rawResult = await callGeminiVision(parts);
-            const resultText = cleanCharacterResponse(rawResult, `【${charName} について】`);
-
-            if (!currentBook.aiCharacters) currentBook.aiCharacters = {};
-            currentBook.aiCharacters[cacheKey] = resultText;
-            await saveBook(currentBook);
-
-            aiCharacterResult.textContent = resultText;
-            showToast('人物解説を取得・保存しました');
+            
+            const resultText = `【回答】\n\n` + rawResult.replace(/\*\*/g, '').trim();
+            aiQueryResult.textContent = resultText;
+            showToast('回答を生成しました');
         } catch (err) {
-            aiCharacterResult.textContent = `❌ エラー: ${err.message}`;
+            aiQueryResult.textContent = `❌ エラー: ${err.message}`;
+        } finally {
+            btn.disabled = false;
         }
     };
 
@@ -1451,7 +1271,6 @@
             saveBook(currentBook);
         }
         updateBookmarkUI();
-        updateAIDrawerCache();
     }
 
     function nextPage() {

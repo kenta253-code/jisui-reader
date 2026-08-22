@@ -613,4 +613,929 @@
     const emptyState = document.getElementById('emptyState');
     const emptyStateText = document.getElementById('emptyStateText');
     const shelfFileInput = document.getElementById('shelfFileInput');
-    const collection
+    const collectionBar = document.getElementById('collectionBar');
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const loadingText = document.getElementById('loadingText');
+    const toast = document.getElementById('toast');
+
+    const shelfThemeSelect = document.getElementById('shelfThemeSelect');
+    const readerThemeSelect = document.getElementById('readerThemeSelect');
+    const modeSelect = document.getElementById('modeSelect');
+    const readerBookTitle = document.getElementById('readerBookTitle');
+    const btnBackToShelf = document.getElementById('btnBackToShelf');
+    const btnNext = document.getElementById('btnNext');
+    const btnPrev = document.getElementById('btnPrev');
+    const btnFullscreen = document.getElementById('btnFullscreen');
+    const pageInfo = document.getElementById('pageInfo');
+    const spread = document.getElementById('spread');
+    const leftZone = document.getElementById('left-zone');
+    const rightZone = document.getElementById('right-zone');
+
+    const btnToggleBookmark = document.getElementById('btnToggleBookmark');
+    const btnListBookmarks = document.getElementById('btnListBookmarks');
+    const bookmarkCount = document.getElementById('bookmarkCount');
+    const bookmarkDrawer = document.getElementById('bookmarkDrawer');
+    const btnCloseBookmarkDrawer = document.getElementById('btnCloseBookmarkDrawer');
+    const bookmarkListContainer = document.getElementById('bookmarkListContainer');
+
+    const btnOpenAI = document.getElementById('btnOpenAI');
+    const aiDrawer = document.getElementById('aiDrawer');
+    const btnCloseAIDrawer = document.getElementById('btnCloseAIDrawer');
+    const aiSummaryResult = document.getElementById('aiSummaryResult');
+    const aiCharacterInput = document.getElementById('aiCharacterInput');
+    const aiCharacterResult = document.getElementById('aiCharacterResult');
+    let activeSummaryRange = 'recent';
+
+    const assignModal = document.getElementById('assignModal');
+    const assignBookTitle = document.getElementById('assignBookTitle');
+    const assignCheckboxList = document.getElementById('assignCheckboxList');
+    let targetBookForAssign = null;
+
+    let currentBook = null;
+    let pdfDoc = null;
+    let pageNum = 1;
+    let mode = 'rtl';
+
+    function applyTheme(theme) {
+        document.body.setAttribute('data-theme', theme);
+        shelfThemeSelect.value = theme;
+        readerThemeSelect.value = theme;
+        localStorage.setItem('reader_theme', theme);
+    }
+    const savedTheme = localStorage.getItem('reader_theme') || 'wood';
+    applyTheme(savedTheme);
+
+    shelfThemeSelect.addEventListener('change', (e) => applyTheme(e.target.value));
+    readerThemeSelect.addEventListener('change', (e) => applyTheme(e.target.value));
+
+    function showToast(msg) {
+        toast.textContent = msg;
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+
+    function resetAIPanel() {
+        aiCharacterInput.value = '';
+        aiCharacterResult.textContent = '人物名を入力して「解説」を押すと、作中での立場や主人公との関係性を簡潔に教えます。';
+        activeSummaryRange = 'recent';
+        document.getElementById('btnSummaryRecent').classList.add('active');
+        document.getElementById('btnSummaryTotal').classList.remove('active');
+        aiSummaryResult.textContent = '「エピソードを抽出」を押すと、重要エピソードを表題付きで整理して表示します。';
+    }
+
+    async function renderCollectionTabs(allBooks) {
+        collectionBar.innerHTML = '';
+
+        const allTab = document.createElement('div');
+        allTab.className = `collection-tab ${currentCollection === 'all' ? 'active' : ''}`;
+        allTab.innerHTML = `<span>📚 すべて</span> <span class="tab-count">(${allBooks.length})</span>`;
+        allTab.addEventListener('click', () => {
+            currentCollection = 'all';
+            localStorage.setItem('jisui_active_collection', 'all');
+            renderCollectionTabs(allBooks);
+            renderBookGrid(allBooks);
+        });
+        collectionBar.appendChild(allTab);
+
+        collections.forEach(colName => {
+            const count = allBooks.filter(b => (b.collections || []).includes(colName)).length;
+            const tab = document.createElement('div');
+            tab.className = `collection-tab ${currentCollection === colName ? 'active' : ''}`;
+            tab.innerHTML = `<span>📁 ${colName}</span> <span class="tab-count">(${count})</span>`;
+            
+            tab.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                if (confirm(`コレクション「${colName}」を削除しますか？\n（※本自体は削除されません）`)) {
+                    collections = collections.filter(c => c !== colName);
+                    saveCollections();
+                    if (currentCollection === colName) currentCollection = 'all';
+                    renderCollectionTabs(allBooks);
+                    renderBookGrid(allBooks);
+                }
+            });
+
+            tab.addEventListener('click', () => {
+                currentCollection = colName;
+                localStorage.setItem('jisui_active_collection', colName);
+                renderCollectionTabs(allBooks);
+                renderBookGrid(allBooks);
+            });
+            collectionBar.appendChild(tab);
+        });
+
+        const addBtn = document.createElement('button');
+        addBtn.className = 'collection-tab btn-add-collection';
+        addBtn.innerHTML = `＋ 新しい本棚・著者`;
+        addBtn.addEventListener('click', () => {
+            const name = prompt('新しいコレクション名を入力してください：');
+            if (name && name.trim()) {
+                const trimmed = name.trim();
+                if (!collections.includes(trimmed)) {
+                    collections.push(trimmed);
+                    saveCollections();
+                    currentCollection = trimmed;
+                    renderCollectionTabs(allBooks);
+                    renderBookGrid(allBooks);
+                    showToast(`「${trimmed}」を作成しました`);
+                }
+            }
+        });
+        collectionBar.appendChild(addBtn);
+    }
+
+    function renderBookGrid(allBooks) {
+        bookGrid.innerHTML = '';
+
+        let filteredBooks = allBooks;
+        if (currentCollection !== 'all') {
+            filteredBooks = allBooks.filter(b => (b.collections || []).includes(currentCollection));
+        }
+
+        if (filteredBooks.length === 0) {
+            emptyState.style.display = 'flex';
+            emptyStateText.textContent = currentCollection === 'all' ? '本棚に本がありません' : `「${currentCollection}」に本がありません`;
+            return;
+        }
+        emptyState.style.display = 'none';
+
+        filteredBooks.forEach((book) => {
+            const card = document.createElement('div');
+            card.className = 'book-card';
+
+            const progressPercent = book.totalPages ? Math.round((book.currentPage / book.totalPages) * 100) : 0;
+            const bookmarkNum = (book.bookmarks || []).length;
+
+            card.innerHTML = `
+                <div class="book-cover-wrap">
+                    ${book.coverData ? `<img src="${book.coverData}" alt="表紙">` : `<div class="book-cover-placeholder">📖</div>`}
+                </div>
+                <div class="book-info">
+                    <div class="book-title" title="${book.title}">${book.title}</div>
+                    <div class="book-progress-text">${book.currentPage} / ${book.totalPages}P (${progressPercent}%)</div>
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill" style="width: ${progressPercent}%;"></div>
+                    </div>
+                    <div class="card-actions">
+                        <button class="card-action-btn" onclick="event.stopPropagation(); openAssignModal(${book.id})">📁 整理</button>
+                        <span>🔖 ${bookmarkNum}</span>
+                        <button class="btn btn-danger" onclick="event.stopPropagation(); removeBook(${book.id}, '${book.title.replace(/'/g, "\\'")}')">削除</button>
+                    </div>
+                </div>
+            `;
+
+            card.addEventListener('click', () => openReader(book.id));
+            bookGrid.appendChild(card);
+        });
+    }
+
+    async function loadBookshelf() {
+        const books = await getAllBooks();
+        await renderCollectionTabs(books);
+        renderBookGrid(books);
+    }
+
+    window.openAssignModal = async function(bookId) {
+        targetBookForAssign = await getBook(bookId);
+        if (!targetBookForAssign) return;
+
+        assignBookTitle.textContent = targetBookForAssign.title;
+        assignCheckboxList.innerHTML = '';
+
+        if (collections.length === 0) {
+            assignCheckboxList.innerHTML = '<div style="color:var(--text-sub);">コレクションがありません。</div>';
+        } else {
+            const bookCols = targetBookForAssign.collections || [];
+            collections.forEach(col => {
+                const label = document.createElement('label');
+                label.className = 'checkbox-item';
+                label.innerHTML = `
+                    <input type="checkbox" value="${col}" ${bookCols.includes(col) ? 'checked' : ''}>
+                    <span>${col}</span>
+                `;
+                assignCheckboxList.appendChild(label);
+            });
+        }
+
+        assignModal.classList.add('open');
+    };
+
+    window.closeAssignModal = function() {
+        assignModal.classList.remove('open');
+        targetBookForAssign = null;
+    };
+
+    window.saveAssignCollections = async function() {
+        if (!targetBookForAssign) return;
+        const checked = Array.from(assignCheckboxList.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
+        targetBookForAssign.collections = checked;
+        await saveBook(targetBookForAssign);
+        closeAssignModal();
+        await loadBookshelf();
+        showToast('コレクションを更新しました');
+    };
+
+    shelfFileInput.addEventListener('change', async (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
+
+        loadingOverlay.style.display = 'flex';
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            loadingText.textContent = `取り込み中 (${i + 1}/${files.length}): ${file.name}`;
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const tempPdf = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
+                
+                let coverData = null;
+                try {
+                    const page1 = await tempPdf.getPage(1);
+                    const viewport = page1.getViewport({ scale: 0.5 });
+                    const canvas = document.createElement('canvas');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+                    const ctx = canvas.getContext('2d');
+                    await page1.render({ canvasContext: ctx, viewport }).promise;
+                    coverData = canvas.toDataURL('image/jpeg', 0.8);
+                } catch (err) {}
+
+                const title = file.name.replace(/\.pdf$/i, '');
+                const defaultCols = (currentCollection !== 'all') ? [currentCollection] : [];
+
+                const newBook = {
+                    title: title,
+                    fileName: file.name,
+                    fileData: arrayBuffer,
+                    coverData: coverData,
+                    totalPages: tempPdf.numPages,
+                    currentPage: 1,
+                    mode: 'rtl',
+                    bookmarks: [],
+                    collections: defaultCols,
+                    aiSummaries: {},
+                    aiCharacters: {},
+                    addedAt: Date.now(),
+                    lastReadAt: Date.now()
+                };
+
+                await saveBook(newBook);
+            } catch (err) {
+                alert(`「${file.name}」の読み込みに失敗しました。`);
+            }
+        }
+
+        shelfFileInput.value = '';
+        loadingOverlay.style.display = 'none';
+        await loadBookshelf();
+        showToast('本棚に本を追加しました');
+    });
+
+    window.removeBook = async function(id, title) {
+        if (confirm(`「${title}」を本棚から削除しますか？`)) {
+            await deleteBook(id);
+            await loadBookshelf();
+            showToast('本棚から削除しました');
+        }
+    };
+
+    async function openReader(bookId) {
+        loadingOverlay.style.display = 'flex';
+        loadingText.textContent = '本を開いています...';
+
+        try {
+            currentBook = await getBook(bookId);
+            if (!currentBook) throw new Error("Book not found");
+            if (!currentBook.bookmarks) currentBook.bookmarks = [];
+            if (!currentBook.aiSummaries) currentBook.aiSummaries = {};
+            if (!currentBook.aiCharacters) currentBook.aiCharacters = {};
+
+            pdfDoc = await pdfjsLib.getDocument({ data: currentBook.fileData.slice(0) }).promise;
+            pageNum = currentBook.currentPage || 1;
+            mode = currentBook.mode || 'rtl';
+            modeSelect.value = mode;
+            readerBookTitle.textContent = currentBook.title;
+
+            resetAIPanel();
+
+            bookmarkDrawer.classList.remove('open');
+            aiDrawer.classList.remove('open');
+            bookshelfView.style.display = 'none';
+            readerView.style.display = 'flex';
+
+            renderSpread();
+            updateBookmarkUI();
+            updateAIDrawerCache();
+
+            if (pageNum > 1) {
+                showToast(`前回の続き（P.${pageNum}）から再開しました`);
+            }
+        } catch (err) {
+            alert("本を開けませんでした。");
+        } finally {
+            loadingOverlay.style.display = 'none';
+        }
+    }
+
+    btnBackToShelf.addEventListener('click', async () => {
+        if (document.fullscreenElement) {
+            document.exitFullscreen().catch(()=>{});
+        }
+        bookmarkDrawer.classList.remove('open');
+        aiDrawer.classList.remove('open');
+        resetAIPanel();
+        readerView.style.display = 'none';
+        bookshelfView.style.display = 'flex';
+        pdfDoc = null;
+        currentBook = null;
+        await loadBookshelf();
+    });
+
+    function getCurrentVisiblePages() {
+        if (pageNum === 1) return [1];
+        const p1 = pageNum;
+        const p2 = pageNum + 1 <= pdfDoc.numPages ? pageNum + 1 : null;
+        return p2 ? [p1, p2] : [p1];
+    }
+
+    function isCurrentSpreadBookmarked() {
+        if (!currentBook || !currentBook.bookmarks) return false;
+        const pages = getCurrentVisiblePages();
+        return currentBook.bookmarks.some(b => pages.includes(b.page));
+    }
+
+    function updateBookmarkUI() {
+        if (!currentBook) return;
+        const count = (currentBook.bookmarks || []).length;
+        bookmarkCount.textContent = count;
+
+        if (isCurrentSpreadBookmarked()) {
+            btnToggleBookmark.classList.add('btn-bookmark-active');
+            btnToggleBookmark.textContent = '🔖 しおり済み';
+        } else {
+            btnToggleBookmark.classList.remove('btn-bookmark-active');
+            btnToggleBookmark.textContent = '🔖 しおり';
+        }
+    }
+
+    btnToggleBookmark.addEventListener('click', async () => {
+        if (!currentBook) return;
+        if (!currentBook.bookmarks) currentBook.bookmarks = [];
+
+        const pages = getCurrentVisiblePages();
+        const existingIndex = currentBook.bookmarks.findIndex(b => pages.includes(b.page));
+
+        if (existingIndex >= 0) {
+            const removed = currentBook.bookmarks.splice(existingIndex, 1)[0];
+            await saveBook(currentBook);
+            updateBookmarkUI();
+            renderBookmarkList();
+            showToast(`P.${removed.page} のしおりを外しました`);
+        } else {
+            const targetPage = pageNum;
+            const now = new Date();
+            const dateStr = `${now.getMonth() + 1}/${now.getDate()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+            
+            currentBook.bookmarks.push({
+                page: targetPage,
+                date: dateStr,
+                timestamp: Date.now()
+            });
+
+            currentBook.bookmarks.sort((a, b) => a.page - b.page);
+            await saveBook(currentBook);
+            updateBookmarkUI();
+            renderBookmarkList();
+            showToast(`P.${targetPage} にしおりを挟みました`);
+        }
+    });
+
+    function renderBookmarkList() {
+        if (!currentBook) return;
+        bookmarkListContainer.innerHTML = '';
+
+        const bookmarks = currentBook.bookmarks || [];
+        if (bookmarks.length === 0) {
+            bookmarkListContainer.innerHTML = `
+                <div style="text-align:center; color:var(--text-sub); padding:40px 10px; font-size:13px; line-height:1.6;">
+                    しおりがありません。<br>
+                    ツールバーの「🔖 しおり」を押して気になるページを保存できます。
+                </div>
+            `;
+            return;
+        }
+
+        bookmarks.forEach((bm, index) => {
+            const item = document.createElement('div');
+            item.className = 'bookmark-item';
+            item.innerHTML = `
+                <div>
+                    <div class="bookmark-item-title">📖 P.${bm.page}</div>
+                    <div class="bookmark-item-date">${bm.date}</div>
+                </div>
+                <button class="btn btn-danger" onclick="event.stopPropagation(); deleteBookmark(${index})">削除</button>
+            `;
+            item.addEventListener('click', () => {
+                jumpToPage(bm.page);
+                bookmarkDrawer.classList.remove('open');
+            });
+            bookmarkListContainer.appendChild(item);
+        });
+    }
+
+    window.deleteBookmark = async function(index) {
+        if (!currentBook || !currentBook.bookmarks) return;
+        const removed = currentBook.bookmarks.splice(index, 1)[0];
+        await saveBook(currentBook);
+        updateBookmarkUI();
+        renderBookmarkList();
+        showToast(`P.${removed.page} のしおりを削除しました`);
+    };
+
+    function jumpToPage(targetPage) {
+        if (!pdfDoc) return;
+        if (targetPage === 1) {
+            pageNum = 1;
+        } else {
+            pageNum = (targetPage % 2 === 0) ? targetPage : targetPage - 1;
+        }
+        renderSpread();
+        updateBookmarkUI();
+    }
+
+    btnListBookmarks.addEventListener('click', () => {
+        aiDrawer.classList.remove('open');
+        renderBookmarkList();
+        bookmarkDrawer.classList.toggle('open');
+    });
+
+    btnCloseBookmarkDrawer.addEventListener('click', () => {
+        bookmarkDrawer.classList.remove('open');
+    });
+
+    btnOpenAI.addEventListener('click', () => {
+        bookmarkDrawer.classList.remove('open');
+        updateAIDrawerCache();
+        aiDrawer.classList.toggle('open');
+    });
+
+    btnCloseAIDrawer.addEventListener('click', () => {
+        aiDrawer.classList.remove('open');
+    });
+
+    window.setSummaryRange = function(range) {
+        activeSummaryRange = range;
+        document.getElementById('btnSummaryRecent').classList.toggle('active', range === 'recent');
+        document.getElementById('btnSummaryTotal').classList.toggle('active', range === 'total');
+        updateAIDrawerCache();
+    };
+
+    function getSummaryKey() {
+        const currentPage = pageNum;
+        if (activeSummaryRange === 'total') {
+            return `total_episodes_p${currentPage}`;
+        } else {
+            const bms = (currentBook.bookmarks || []).filter(b => b.page < currentPage);
+            const prevPage = bms.length > 0 ? bms[bms.length - 1].page : (currentPage > 2 ? 2 : 1);
+            return `recent_episodes_p${prevPage}_to_p${currentPage}`;
+        }
+    }
+
+    function updateAIDrawerCache() {
+        if (!currentBook) return;
+        const key = getSummaryKey();
+        if (currentBook.aiSummaries && currentBook.aiSummaries[key]) {
+            aiSummaryResult.textContent = currentBook.aiSummaries[key];
+        } else {
+            aiSummaryResult.textContent = activeSummaryRange === 'recent' 
+                ? '「エピソードを抽出」を押すと、直前のしおり位置から現在までの重要エピソードを表題付きで整理して表示します。'
+                : '「エピソードを抽出」を押すと、冒頭から現在までの主な重要エピソードを表題付きで整理して表示します。';
+        }
+    }
+
+    async function extractPageImagesForAI(startPage, endPage, maxSamplePages = 8) {
+        const actualStart = (startPage === 1 && endPage > 1) ? 2 : startPage;
+        const total = endPage - actualStart + 1;
+        let targetPages = [];
+
+        if (total <= maxSamplePages) {
+            for (let p = actualStart; p <= endPage; p++) targetPages.push(p);
+        } else {
+            const step = total / maxSamplePages;
+            for (let i = 0; i < maxSamplePages; i++) {
+                targetPages.push(Math.min(endPage, Math.round(actualStart + i * step)));
+            }
+            targetPages = Array.from(new Set(targetPages));
+        }
+
+        const imageParts = [];
+        for (const pNum of targetPages) {
+            try {
+                const page = await pdfDoc.getPage(pNum);
+                const viewport = page.getViewport({ scale: 0.8 });
+                const canvas = document.createElement('canvas');
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                const ctx = canvas.getContext('2d');
+                await page.render({ canvasContext: ctx, viewport }).promise;
+                
+                const base64 = canvas.toDataURL('image/jpeg', 0.6).split(',')[1];
+                imageParts.push({
+                    inlineData: {
+                        mimeType: "image/jpeg",
+                        data: base64
+                    }
+                });
+            } catch (err) {}
+        }
+        return imageParts;
+    }
+
+    // JSON・テキストどちらが返ってきても重複なしで1回分に整形する安全パーサー
+    function parseAndFormatEpisodes(rawText, headerPrefix) {
+        if (!rawText) return "解析結果を取得できませんでした。";
+
+        let text = rawText.trim();
+
+        // 1. JSON解析トライ（エラーが出てもcatchして安全にフォールバック）
+        try {
+            const jsonMatch = text.match(/\[[\s\S]*\]/);
+            if (jsonMatch) {
+                const episodes = JSON.parse(jsonMatch[0]);
+                if (Array.isArray(episodes) && episodes.length > 0) {
+                    const formatted = episodes.slice(0, 8).map((ep, idx) => {
+                        const title = (ep.title || '').replace(/^\d+[\.\s、]+/, '').trim();
+                        const detail = (ep.detail || '').trim();
+                        return `${idx + 1}. ${title}\n\n${detail}`;
+                    }).join('\n\n');
+                    return headerPrefix + '\n\n' + formatted;
+                }
+            }
+        } catch (e) {
+            // JSON parse error時は通常テキスト処理へ
+        }
+
+        // 2. テキスト解析フォールバック
+        text = text.replace(/```json/gi, '').replace(/```/g, '').replace(/\*\*/g, '').trim();
+
+        const lines = text.split('\n');
+        const formattedBlocks = [];
+        let count = 0;
+        let curBlock = [];
+        const seenTitles = new Set();
+
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            if (/^(Constraint|Image|Draft|Context|Characters|Key Plot|Refinement|Title|Content|Length|No spoilers|Final Version|Okay|\*)/i.test(trimmed)) continue;
+
+            const m = trimmed.match(/^(\d+)[\.\s、\)]\s*(.+)$/);
+            if (m) {
+                const num = parseInt(m[1], 10);
+                const title = m[2].trim();
+
+                // 2回目の「1.」または既出表題で即座にループ終了
+                if ((num <= count && count > 0) || seenTitles.has(title)) {
+                    break;
+                }
+
+                if (curBlock.length > 0) {
+                    formattedBlocks.push(curBlock.join('\n\n'));
+                    curBlock = [];
+                }
+
+                count++;
+                seenTitles.add(title);
+                curBlock.push(`${count}. ${title}`);
+            } else if (count > 0) {
+                const jpMatch = trimmed.match(/[\u3040-\u309F\u4E00-\u9FAF]/g);
+                if (jpMatch && jpMatch.length >= 3) {
+                    curBlock.push(trimmed);
+                }
+            }
+        }
+
+        if (curBlock.length > 0) {
+            formattedBlocks.push(curBlock.join('\n\n'));
+        }
+
+        if (formattedBlocks.length > 0) {
+            return headerPrefix + '\n\n' + formattedBlocks.join('\n\n');
+        }
+
+        return headerPrefix + '\n\n' + text;
+    }
+
+    async function callGeminiVision(parts) {
+        const mRes = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models?key=$](https://generativelanguage.googleapis.com/v1beta/models?key=$){GEMINI_API_KEY}`);
+        const mData = await mRes.json();
+        
+        if (!mData.models || mData.models.length === 0) {
+            throw new Error('利用可能なGeminiモデルが見つかりません。');
+        }
+
+        const candidateModels = mData.models.filter(m => 
+            m.supportedGenerationMethods && 
+            m.supportedGenerationMethods.includes('generateContent') && 
+            !m.name.includes('embedding')
+        );
+
+        for (const model of candidateModels) {
+            try {
+                const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/$](https://generativelanguage.googleapis.com/v1beta/$){model.name}:generateContent?key=${GEMINI_API_KEY}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts }] })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                }
+            } catch(e) {
+                continue;
+            }
+        }
+        throw new Error('利用可能なGeminiモデルでの解析に失敗しました。');
+    }
+
+    // エピソード抽出アクション
+    window.generateSummaryAction = async function() {
+        if (!pdfDoc || !currentBook) return;
+
+        const currentPage = pageNum;
+        let startPage = 1;
+        if (activeSummaryRange === 'recent') {
+            const bms = (currentBook.bookmarks || []).filter(b => b.page < currentPage);
+            startPage = bms.length > 0 ? bms[bms.length - 1].page : (currentPage > 2 ? 2 : 1);
+        }
+
+        aiSummaryResult.textContent = `P.${startPage} 〜 P.${currentPage} を探索してエピソードを抽出中... ⏳`;
+        const btn = document.getElementById('btnGenerateSummary');
+        btn.disabled = true;
+
+        try {
+            const imageParts = await extractPageImagesForAI(startPage, currentPage, 6);
+            if (imageParts.length === 0) throw new Error("ページの読み込みに失敗しました。");
+
+            const promptText = `あなたは小説読書アシスタントです。添付された本文ページ画像（P.${startPage}〜P.${currentPage}）を読み取り、この範囲の中で起きた「重要で象徴的なエピソード」を時系列順に【それぞれ表題をつけて最大5〜8個】提示してください。
+
+【出力形式】
+1. 表題
+出来事の具体的な経緯、登場人物の行動や心理、起きた結果を説明した2〜3行の日本語の解説文。
+
+2. 表題
+解説文。
+
+【厳格な指示】
+1. 英語の思考プロセスや下書き、挨拶、同じ文章の繰り返しは一切禁止します。最終的な「1. 表題」から始まる日本語本文のみを1回だけ出力してください。
+2. ネタバレは一切書かないでください。`;
+
+            const parts = [{ text: promptText }, ...imageParts];
+            const rawResult = await callGeminiVision(parts);
+            const resultText = parseAndFormatEpisodes(rawResult, `【P.${startPage}〜P.${currentPage} の主要エピソード】`);
+
+            const key = getSummaryKey();
+            if (!currentBook.aiSummaries) currentBook.aiSummaries = {};
+            currentBook.aiSummaries[key] = resultText;
+            await saveBook(currentBook);
+
+            aiSummaryResult.textContent = resultText;
+            showToast('主要エピソードを更新しました');
+        } catch (err) {
+            aiSummaryResult.textContent = `❌ エラー: ${err.message}`;
+        } finally {
+            btn.disabled = false;
+        }
+    };
+
+    // 人物解説アクション
+    window.queryCharacterAction = async function() {
+        const charName = aiCharacterInput.value.trim();
+        if (!charName) {
+            alert('人物名を入力してください。');
+            return;
+        }
+        if (!pdfDoc || !currentBook) return;
+
+        const currentPage = pageNum;
+        const cacheKey = `${charName}_p${currentPage}`;
+
+        aiCharacterResult.textContent = `P.1〜P.${currentPage} を探索して「${charName}」の情報を整理中... ⏳`;
+
+        try {
+            const bookTitle = currentBook.title || '小説・書籍';
+            const imageParts = await extractPageImagesForAI(1, currentPage, 8);
+
+            const promptText = `あなたは小説読書アシスタントです。
+作品名：『${bookTitle}』
+調査対象の人物名：『${charName}』
+現在の読書位置：P.${currentPage}まで
+
+添付された本文画像（P.1〜P.${currentPage}の抜粋）および作品設定をもとに、「${charName}」について解説してください。
+
+【厳格な指示】
+1. P.${currentPage}までの範囲で作中に登場・言及されている「立場・職業・身分」「主人公との関係性」「どのような人物か」を2〜4行程度の自然な日本語で簡潔に解説してください。
+2. もし画像内に直接の記述が少ない場合でも、「画像に見当たらない」等のメタ発言は絶対に書かず、作品のジャンル・時代背景・文脈から推測される役割を自然に説明してください。
+3. ネタバレは一切書かないでください。
+4. 英語の思考メモは含めず、日本語の解説文のみを出力してください。`;
+
+            const parts = [{ text: promptText }, ...imageParts];
+            const rawResult = await callGeminiVision(parts);
+            
+            let cleaned = rawResult.replace(/\*\*/g, '').trim();
+            const jsonMatch = cleaned.match(/\{[\s\S]*"summary"[\s\S]*:[\s\S]*"([^"]+)"[\s\S]*\}/);
+            if (jsonMatch && jsonMatch[1]) {
+                cleaned = jsonMatch[1].replace(/\\n/g, '\n').trim();
+            }
+
+            const resultText = `【${charName} について】\n\n${cleaned}`;
+
+            if (!currentBook.aiCharacters) currentBook.aiCharacters = {};
+            currentBook.aiCharacters[cacheKey] = resultText;
+            await saveBook(currentBook);
+
+            aiCharacterResult.textContent = resultText;
+            showToast('人物解説を取得・保存しました');
+        } catch (err) {
+            aiCharacterResult.textContent = `❌ エラー: ${err.message}`;
+        }
+    };
+
+    modeSelect.addEventListener('change', (e) => {
+        mode = e.target.value;
+        if (currentBook) {
+            currentBook.mode = mode;
+            saveBook(currentBook);
+        }
+        if (pdfDoc) renderSpread();
+    });
+
+    async function getRenderedCanvas(num, targetHeight) {
+        if (num < 1 || num > pdfDoc.numPages) return null;
+        const page = await pdfDoc.getPage(num);
+        const unscaledViewport = page.getViewport({ scale: 1.0 });
+        const scale = targetHeight / unscaledViewport.height;
+        const viewport = page.getViewport({ scale: scale });
+
+        const canvas = document.createElement('canvas');
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        const ctx = canvas.getContext('2d');
+        await page.render({ canvasContext: ctx, viewport }).promise;
+        return canvas;
+    }
+
+    async function renderSpread() {
+        if (!pdfDoc) return;
+        spread.innerHTML = '';
+
+        const containerHeight = document.getElementById('viewer-container').clientHeight - 24;
+
+        if (pageNum === 1) {
+            pageInfo.textContent = `1 / ${pdfDoc.numPages}`;
+            const canvas = await getRenderedCanvas(1, containerHeight);
+            if (canvas) spread.appendChild(canvas);
+        } else {
+            const p1 = pageNum;
+            const p2 = pageNum + 1 <= pdfDoc.numPages ? pageNum + 1 : null;
+            pageInfo.textContent = p2 ? `${p1}-${p2} / ${pdfDoc.numPages}` : `${p1} / ${pdfDoc.numPages}`;
+
+            let leftPageNum, rightPageNum;
+            if (mode === 'rtl') {
+                leftPageNum = p2;
+                rightPageNum = p1;
+            } else {
+                leftPageNum = p1;
+                rightPageNum = p2;
+            }
+
+            const leftCanvas = leftPageNum ? await getRenderedCanvas(leftPageNum, containerHeight) : null;
+            const rightCanvas = rightPageNum ? await getRenderedCanvas(rightPageNum, containerHeight) : null;
+
+            if (leftCanvas) spread.appendChild(leftCanvas);
+            if (rightCanvas) spread.appendChild(rightCanvas);
+        }
+
+        if (currentBook) {
+            currentBook.currentPage = pageNum;
+            currentBook.lastReadAt = Date.now();
+            saveBook(currentBook);
+        }
+        updateBookmarkUI();
+        updateAIDrawerCache();
+    }
+
+    function nextPage() {
+        if (!pdfDoc) return;
+        if (pageNum === 1) {
+            if (pdfDoc.numPages >= 2) pageNum = 2;
+        } else {
+            if (pageNum + 2 <= pdfDoc.numPages) {
+                pageNum += 2;
+            } else if (pageNum + 1 <= pdfDoc.numPages) {
+                pageNum += 2;
+            }
+        }
+        renderSpread();
+    }
+
+    function prevPage() {
+        if (!pdfDoc) return;
+        if (pageNum === 2) {
+            pageNum = 1;
+        } else if (pageNum > 2) {
+            pageNum -= 2;
+        }
+        renderSpread();
+    }
+
+    btnNext.addEventListener('click', nextPage);
+    btnPrev.addEventListener('click', prevPage);
+
+    leftZone.addEventListener('click', () => {
+        if (mode === 'rtl') nextPage();
+        else prevPage();
+    });
+
+    rightZone.addEventListener('click', () => {
+        if (mode === 'rtl') prevPage();
+        else nextPage();
+    });
+
+    function toggleFullscreen() {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(err => {});
+        } else {
+            if (document.exitFullscreen) document.exitFullscreen();
+        }
+    }
+
+    btnFullscreen.addEventListener('click', toggleFullscreen);
+
+    document.addEventListener('fullscreenchange', () => {
+        if (document.fullscreenElement) {
+            document.body.classList.add('fullscreen-mode');
+            btnFullscreen.textContent = '✖ 戻す';
+        } else {
+            document.body.classList.remove('fullscreen-mode');
+            btnFullscreen.textContent = '⛶ 全画面';
+        }
+        setTimeout(() => {
+            if (pdfDoc) renderSpread();
+        }, 100);
+    });
+
+    window.addEventListener('keydown', (e) => {
+        if (readerView.style.display !== 'flex') return;
+
+        if (e.key === 'b' || e.key === 'B') {
+            btnToggleBookmark.click();
+            return;
+        }
+        if (e.key === 'f' || e.key === 'F') {
+            toggleFullscreen();
+            return;
+        }
+        if (e.key === 'Escape') {
+            if (assignModal.classList.contains('open')) {
+                closeAssignModal();
+                return;
+            }
+            if (aiDrawer.classList.contains('open')) {
+                aiDrawer.classList.remove('open');
+                return;
+            }
+            if (bookmarkDrawer.classList.contains('open')) {
+                bookmarkDrawer.classList.remove('open');
+                return;
+            }
+            if (document.fullscreenElement) {
+                document.exitFullscreen().catch(()=>{});
+            } else {
+                btnBackToShelf.click();
+            }
+            return;
+        }
+        if (!pdfDoc) return;
+        if (e.key === 'ArrowLeft') {
+            if (mode === 'rtl') nextPage();
+            else prevPage();
+        } else if (e.key === 'ArrowRight') {
+            if (mode === 'rtl') prevPage();
+            else nextPage();
+        }
+    });
+
+    window.addEventListener('resize', () => {
+        if (pdfDoc && readerView.style.display === 'flex') {
+            renderSpread();
+        }
+    });
+
+    openDB().then(() => {
+        loadBookshelf();
+    }).catch(err => {
+        alert("データベースの初期化に失敗しました。");
+    });
+</script>
+</body>
+</html>

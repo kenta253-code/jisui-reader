@@ -459,7 +459,7 @@
 
             <select id="modeSelect">
                 <option value="rtl">右開き (縦書き小説)</option>
-                <option value="ltr">左開き (横書き書籍)</option>
+                <option value="ltr">左開き (横書籍)</option>
             </select>
 
             <select id="readerThemeSelect">
@@ -1157,87 +1157,109 @@
         let text = rawText.replace(/\*\*/g, '').replace(/```[a-z]*/gi, '').trim();
 
         const lines = text.split('\n');
-        const formattedBlocks = [];
-        let curBlock = [];
-        let count = 0;
+        const episodes = [];
+        let currentEp = null;
         const seenTitles = new Set();
 
         for (let i = 0; i < lines.length; i++) {
-            const trimmed = lines[i].trim();
-            if (!trimmed) continue;
+            let line = lines[i].trim();
+            if (!line) continue;
 
-            // 英語見出し・メタ行（Cover, P.27, Constraint等）を除外
-            if (/^\d+[\.\s、\)]\s*(Cover|P\.\d+|Image|Strategy|Suspicion|Archery|Changing|Introduction)/i.test(trimmed)) continue;
-            if (/^(Constraint|Image|Draft|Context|Characters|Key Plot|Refinement|Title|Content|Length|No spoilers|Final Version|Okay|\*|\[|\{|\})/i.test(trimmed)) continue;
+            if (/^(Constraint|Image|Draft|Context|Characters|Key Plot|Refinement|Title|Content|Length|No spoilers|Final Version|Okay|\*)/i.test(line)) {
+                continue;
+            }
 
-            // 「1. 表題」のパターンを検出（日本語文字を含む）
-            const m = trimmed.match(/^(\d+)[\.\s、\)]\s*([^\(（\n]+[\u3040-\u309F\u4E00-\u9FAF].*)$/);
-            if (m) {
-                const title = m[2].replace(/\(.*?\)|（.*?）/g, '').trim();
+            const match = line.match(/^(\d+)[\.\s、\)]\s*(.+)$/);
+            if (match) {
+                let title = match[2].trim();
+                title = title.replace(/\([A-Za-z0-9\s"'\.,\-_–—]+\)/g, '').replace(/（[A-Za-z0-9\s"'\.,\-_–—]+）/g, '').trim();
 
-                // 2周目の重複（既出の表題または番号が戻った場合）は切断して終了
-                if (seenTitles.has(title)) break;
+                const jpCount = (title.match(/[\u3040-\u309F\u4E00-\u9FAF]/g) || []).length;
+                if (jpCount >= 2 && !/^(Cover|P\.\d+|Image)/i.test(title)) {
+                    const normalizedTitle = title.substring(0, 8);
+                    if (seenTitles.has(normalizedTitle)) {
+                        break;
+                    }
 
-                if (curBlock.length > 0) {
-                    formattedBlocks.push(curBlock.join('\n\n'));
-                    curBlock = [];
+                    if (currentEp && currentEp.detail.length > 0) {
+                        episodes.push(currentEp);
+                        seenTitles.add(currentEp.title.substring(0, 8));
+                    }
+
+                    currentEp = {
+                        title: title,
+                        detail: []
+                    };
+                    continue;
                 }
+            }
 
-                count++;
-                seenTitles.add(title);
-                curBlock.push(`${count}. ${title}`);
-            } else if (count > 0) {
-                // 解説文
-                const jpMatch = trimmed.match(/[\u3040-\u309F\u4E00-\u9FAF]/g);
-                if (jpMatch && jpMatch.length >= 3 && !/^\d+[\.\s]/.test(trimmed)) {
-                    curBlock.push(trimmed);
+            if (currentEp) {
+                const jpCount = (line.match(/[\u3040-\u309F\u4E00-\u9FAF]/g) || []).length;
+                if (jpCount >= 4) {
+                    currentEp.detail.push(line);
                 }
             }
         }
 
-        if (curBlock.length > 0) {
-            formattedBlocks.push(curBlock.join('\n\n'));
+        if (currentEp && currentEp.detail.length > 0 && !seenTitles.has(currentEp.title.substring(0, 8))) {
+            episodes.push(currentEp);
         }
 
-        if (formattedBlocks.length > 0) {
-            return headerPrefix + '\n\n' + formattedBlocks.join('\n\n');
+        if (episodes.length > 0) {
+            const formatted = episodes.slice(0, 8).map((ep, idx) => {
+                return `${idx + 1}. ${ep.title}\n\n${ep.detail.join('\n')}`;
+            }).join('\n\n');
+            return headerPrefix + '\n\n' + formatted;
         }
 
         return headerPrefix + '\n\n' + text;
     }
 
-    // 安定稼働する確定モデルリスト直接試行方式
+    // 確実な動的検出とモデルフォールバック通信
     async function callGeminiVision(parts) {
-        const directModels = [
-            'gemini-2.5-flash',
-            'gemini-1.5-flash',
-            'gemini-1.5-pro'
-        ];
+        let candidateModels = [];
 
-        let lastErr = null;
-        for (const modelName of directModels) {
+        try {
+            const mRes = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models?key=$](https://generativelanguage.googleapis.com/v1beta/models?key=$){GEMINI_API_KEY}`);
+            if (mRes.ok) {
+                const mData = await mRes.json();
+                if (mData && mData.models) {
+                    candidateModels = mData.models.filter(m => 
+                        m.supportedGenerationMethods && 
+                        m.supportedGenerationMethods.includes('generateContent') && 
+                        !m.name.includes('embedding')
+                    );
+                }
+            }
+        } catch (e) {}
+
+        if (candidateModels.length === 0) {
+            candidateModels = [
+                { name: 'models/gemini-1.5-flash' },
+                { name: 'models/gemini-2.0-flash' },
+                { name: 'models/gemini-1.5-pro' }
+            ];
+        }
+
+        for (const model of candidateModels) {
             try {
-                const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/$](https://generativelanguage.googleapis.com/v1beta/models/$){modelName}:generateContent?key=${GEMINI_API_KEY}`, {
+                const endpointName = model.name.startsWith('models/') ? model.name : `models/${model.name}`;
+                const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/$](https://generativelanguage.googleapis.com/v1beta/$){endpointName}:generateContent?key=${GEMINI_API_KEY}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ contents: [{ parts }] })
                 });
                 if (res.ok) {
-                    const textData = await res.text();
-                    try {
-                        const data = JSON.parse(textData);
-                        const result = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                        if (result) return result;
-                    } catch (e) {
-                        continue;
-                    }
+                    const data = await res.json();
+                    const result = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (result) return result;
                 }
             } catch(e) {
-                lastErr = e;
                 continue;
             }
         }
-        throw new Error('Gemini APIとの通信に失敗しました。時間をおいて再試行してください。');
+        throw new Error('Gemini APIでの解析に失敗しました。時間をおいて再試行してください。');
     }
 
     // エピソード抽出アクション

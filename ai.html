@@ -199,7 +199,6 @@
             cursor: text;
         }
 
-        /* ===== 1. 本棚画面 ===== */
         #bookshelf-view {
             flex: 1;
             display: flex;
@@ -413,7 +412,6 @@
             opacity: 0.7;
         }
 
-        /* ===== 2. リーダー画面 ===== */
         #reader-view {
             flex: 1;
             display: none;
@@ -503,7 +501,6 @@
         #left-zone { left: 0; }
         #right-zone { right: 0; }
 
-        /* ===== サイドドロワー共通（しおり / AI） ===== */
         .side-drawer {
             position: absolute;
             top: 50px;
@@ -567,7 +564,6 @@
             margin-top: 2px;
         }
 
-        /* AIサイドパネル専用スタイル */
         .ai-section-box {
             background-color: var(--bg-card);
             border: 1px solid var(--border-color);
@@ -620,7 +616,6 @@
             border: 1px solid var(--border-color);
         }
 
-        /* モーダル */
         .modal-overlay {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
@@ -856,7 +851,7 @@
                         <span>👥 「この人誰だっけ？」人物メモ</span>
                     </div>
                     <div style="display: flex; gap: 6px;">
-                        <input type="text" id="aiCharacterInput" placeholder="人物名（例: 湯川, 草薙）" style="flex: 1; font-size: 12px; padding: 6px 8px;">
+                        <input type="text" id="aiCharacterInput" placeholder="人物名（例: 湯川, 官兵衛）" style="flex: 1; font-size: 12px; padding: 6px 8px;">
                         <button class="btn btn-primary" style="font-size: 12px;" onclick="queryCharacterAction()">解説</button>
                     </div>
                     <div class="ai-result-box" id="aiCharacterResult">人物名を入力して「解説」を押すと、現在読んでいるページまでの範囲で初登場シーンや主人公との関係性を簡潔に教えます。</div>
@@ -1430,7 +1425,7 @@
             return `total_p${currentPage}`;
         } else {
             const bms = (currentBook.bookmarks || []).filter(b => b.page < currentPage);
-            const prevPage = bms.length > 0 ? bms[bms.length - 1].page : 1;
+            const prevPage = bms.length > 0 ? bms[bms.length - 1].page : (currentPage > 2 ? 2 : 1);
             return `recent_p${prevPage}_to_p${currentPage}`;
         }
     }
@@ -1447,15 +1442,19 @@
         }
     }
 
+    // 本文ページのみ（表紙P.1をスキップ）から画像抽出
     async function extractPageImagesForAI(startPage, endPage, maxSamplePages = 8) {
-        const total = endPage - startPage + 1;
+        // P.1（表紙）は除外して本文（P.2〜）から抽出
+        const actualStart = (startPage === 1 && endPage > 1) ? 2 : startPage;
+        const total = endPage - actualStart + 1;
         let targetPages = [];
+
         if (total <= maxSamplePages) {
-            for (let p = startPage; p <= endPage; p++) targetPages.push(p);
+            for (let p = actualStart; p <= endPage; p++) targetPages.push(p);
         } else {
             const step = total / maxSamplePages;
             for (let i = 0; i < maxSamplePages; i++) {
-                targetPages.push(Math.min(endPage, Math.round(startPage + i * step)));
+                targetPages.push(Math.min(endPage, Math.round(actualStart + i * step)));
             }
             targetPages = Array.from(new Set(targetPages));
         }
@@ -1485,7 +1484,6 @@
         return imageParts;
     }
 
-    // Googleから動的に有効モデルを取得して自動フォールバック実行する関数
     async function callGeminiVision(parts) {
         const mRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`);
         const mData = await mRes.json();
@@ -1509,7 +1507,15 @@
                 });
                 if (res.ok) {
                     const data = await res.json();
-                    return data.candidates?.[0]?.content?.parts?.[0]?.text || '解析結果を取得できませんでした。';
+                    let raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                    
+                    // 【クリーンアップ処理】英語のメモや前置きを排除し、最終的な日本語あらすじ部分だけを抽出
+                    if (raw.includes('【')) {
+                        raw = raw.substring(raw.indexOf('【'));
+                    }
+                    // *Final Version:* や *Draft* などの文字を取り除く
+                    raw = raw.replace(/\*Final Version:\*/gi, '').trim();
+                    return raw;
                 }
             } catch(e) {
                 continue;
@@ -1525,7 +1531,7 @@
         let startPage = 1;
         if (activeSummaryRange === 'recent') {
             const bms = (currentBook.bookmarks || []).filter(b => b.page < currentPage);
-            startPage = bms.length > 0 ? bms[bms.length - 1].page : 1;
+            startPage = bms.length > 0 ? bms[bms.length - 1].page : (currentPage > 2 ? 2 : 1);
         }
 
         aiSummaryResult.textContent = `P.${startPage} 〜 P.${currentPage} を解析中... ⏳`;
@@ -1536,11 +1542,16 @@
             const imageParts = await extractPageImagesForAI(startPage, currentPage, 6);
             if (imageParts.length === 0) throw new Error("ページの読み込みに失敗しました。");
 
-            const promptText = `あなたは読書アシスタントです。添付された小説のページ画像（P.${startPage}〜P.${currentPage}の抜粋）を読み取り、以下の条件に従ってあらすじをまとめてください。
-【条件】
-1. この範囲で起きている主要な出来事・主人公の行動・状況の変化を3〜5行程度の簡潔な日本語で要約してください。
-2. この範囲より先の展開（ネタバレ）は一切書かないでください。
-3. 文頭に「【P.${startPage}〜P.${currentPage} のあらすじ】」と記載してください。`;
+            // 英語思考や下書きを禁止する厳格な日本語プロンプト
+            const promptText = `あなたは小説読書アシスタントです。添付された本文ページ画像を読み取り、以下の条件に従って直接あらすじのみを出力してください。英語での思考プロセス、下書き、解説、自己添削は一切出力しないでください。
+
+【出力フォーマット】
+【P.${startPage}〜P.${currentPage} のあらすじ】
+（ここに3〜5行程度の簡潔な日本語で、主要な出来事・登場人物の行動・状況の変化を記載する）
+
+【ルール】
+1. P.${currentPage}より先の展開（ネタバレ）は絶対に含めない。
+2. 出力は上記の【P.${startPage}〜P.${currentPage} のあらすじ】から始まる日本語本文のみとすること。`;
 
             const parts = [{ text: promptText }, ...imageParts];
             const resultText = await callGeminiVision(parts);
@@ -1575,15 +1586,15 @@
             return;
         }
 
-        aiCharacterResult.textContent = `「${charName}」の情報を現在ページまでで探索中... ⏳`;
+        aiCharacterResult.textContent = `「${charName}」の情報を探索中... ⏳`;
 
         try {
             const imageParts = await extractPageImagesForAI(1, currentPage, 8);
-            const promptText = `あなたは小説読書アシスタントです。添付された小説の抜粋画像（P.1〜P.${currentPage}まで）をもとに、「${charName}」という登場人物について教えてください。
-【条件】
-1. P.${currentPage}までの範囲で判明している「初登場時の状況」「立場・職業」「主人公との関係性」を2〜4行程度でわかりやすく解説してください。
-2. まだ作中で明かされていない先の展開や黒幕などのネタバレは絶対に含めないでください。
-3. もし画像内に明確な言及が少ない場合は、わかる範囲での推定と「これまでの登場シーンでの特徴」を述べてください。`;
+            const promptText = `あなたは小説読書アシスタントです。添付された本文抜粋画像（P.1〜P.${currentPage}）をもとに、「${charName}」という登場人物について教えてください。英語での思考プロセスやメモは一切出力せず、日本語の回答のみを出力してください。
+
+【ルール】
+1. P.${currentPage}までの範囲で判明している「立場・職業」「主人公との関係性」「初登場シーンでの特徴」を2〜4行程度の日本語で簡潔に解説してください。
+2. ネタバレは一切書かないでください。`;
 
             const parts = [{ text: promptText }, ...imageParts];
             const resultText = await callGeminiVision(parts);

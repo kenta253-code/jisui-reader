@@ -1150,7 +1150,7 @@
         return imageParts;
     }
 
-    // 安全なテキスト解析パーサー（JSON.parseは一切不使用）
+    // 日本語エピソードブロックのみを重複・英語見出しなしで安全に抽出するパーサー
     function parseAndFormatEpisodes(rawText, headerPrefix) {
         if (!rawText) return "解析結果を取得できませんでした。";
 
@@ -1206,44 +1206,38 @@
         return headerPrefix + '\n\n' + text;
     }
 
+    // 安定稼働する確定モデルリスト直接試行方式
     async function callGeminiVision(parts) {
-        // 安全なfetch処理（JSONパース例外を100%防ぐ安全実装）
-        let mData = null;
-        try {
-            const mRes = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models?key=$](https://generativelanguage.googleapis.com/v1beta/models?key=$){GEMINI_API_KEY}`);
-            const textResponse = await mRes.text();
-            mData = JSON.parse(textResponse);
-        } catch (e) {
-            throw new Error('APIモデル一覧の取得に失敗しました。');
-        }
-        
-        if (!mData || !mData.models || mData.models.length === 0) {
-            throw new Error('利用可能なGeminiモデルが見つかりません。');
-        }
+        const directModels = [
+            'gemini-2.5-flash',
+            'gemini-1.5-flash',
+            'gemini-1.5-pro'
+        ];
 
-        const candidateModels = mData.models.filter(m => 
-            m.supportedGenerationMethods && 
-            m.supportedGenerationMethods.includes('generateContent') && 
-            !m.name.includes('embedding')
-        );
-
-        for (const model of candidateModels) {
+        let lastErr = null;
+        for (const modelName of directModels) {
             try {
-                const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/$](https://generativelanguage.googleapis.com/v1beta/$){model.name}:generateContent?key=${GEMINI_API_KEY}`, {
+                const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/$](https://generativelanguage.googleapis.com/v1beta/models/$){modelName}:generateContent?key=${GEMINI_API_KEY}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ contents: [{ parts }] })
                 });
                 if (res.ok) {
                     const textData = await res.text();
-                    const data = JSON.parse(textData);
-                    return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                    try {
+                        const data = JSON.parse(textData);
+                        const result = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                        if (result) return result;
+                    } catch (e) {
+                        continue;
+                    }
                 }
             } catch(e) {
+                lastErr = e;
                 continue;
             }
         }
-        throw new Error('利用可能なGeminiモデルでの解析に失敗しました。');
+        throw new Error('Gemini APIとの通信に失敗しました。時間をおいて再試行してください。');
     }
 
     // エピソード抽出アクション

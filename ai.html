@@ -1150,17 +1150,26 @@
         return imageParts;
     }
 
-    // 英語思考メモを確実に切り落とし、日本語の「1. ○○」から抽出する関数
+    // 重複（下書き＋清書）を排除し、最後の清書エピソードのみを抽出する関数
     function cleanAIResponse(rawText, fallbackPrefix = "") {
         if (!rawText) return "解析結果を取得できませんでした。";
 
         let text = rawText.trim();
+        // Markdownの太字記号を除去
+        text = text.replace(/\*\*/g, '');
 
-        // 英語の思考・メモ・下書きを完全に排除するため、
-        // 「1. 」または「1、」「1 」に続いて日本語（漢字・ひらがな・カタカナ）が始まる位置を探索
-        const match = text.match(/(?:^|\n)(?:1[\.\s、\)]\s*[\u3040-\u309F\u4E00-\u9FAF])/);
-        if (match && match.index !== undefined) {
-            text = text.substring(match.index).trim();
+        // 「1. 」や「1、」で始まるエピソードの全出現位置を探索
+        const regex = /(?:^|\n)(1[\.\s、\)]\s*[\u3040-\u309F\u4E00-\u9FAF])/g;
+        let match;
+        let lastIndex = -1;
+
+        while ((match = regex.exec(text)) !== null) {
+            lastIndex = match.index;
+        }
+
+        // 複数回「1.」がある場合（下書きと清書がある場合）、最後の清書部分を採用
+        if (lastIndex >= 0) {
+            text = text.substring(lastIndex).trim();
         } else {
             // 見つからない場合は行単位で英語行を除外
             const lines = text.split('\n');
@@ -1238,11 +1247,17 @@
 
             const promptText = `あなたは小説読書アシスタントです。添付された本文ページ画像（P.${startPage}〜P.${currentPage}）を読み取り、この範囲で起きた「重要で象徴的なエピソード」を時系列順に【それぞれ表題をつけて最大5〜8個】にまとめて提示してください。
 
+【出力フォーマット】
+1. 表題
+解説文（2〜3行）
+
+2. 表題
+解説文
+
 【厳格な指示】
-1. 各エピソードは「番号. 表題」の次の行に「2〜3行の具体的な経緯・人物の行動や心理・起きた結果の解説文」を書く構成にしてください。
+1. 下書きや思考プロセス、英語の挨拶は一切出力せず、最終的な「1. 表題」から始まる日本語本文のみを1回だけ出力してください。
 2. 抽象的な要約ではなく、具体的な人物名や起きた事実・事件の経緯がわかるように記述してください。
-3. P.${currentPage}より先の展開（ネタバレ）は絶対に含めないでください。
-4. 英語の思考プロセスや下書き、挨拶は一切出力せず、「1. 」から始まる日本語本文のみを出力してください。`;
+3. P.${currentPage}より先の展開（ネタバレ）は絶対に含めないでください。`;
 
             const parts = [{ text: promptText }, ...imageParts];
             const rawResult = await callGeminiVision(parts);

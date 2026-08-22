@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>自炊本リーダー [AI搭載版]</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22[http://www.w3.org/2000/svg%22](http://www.w3.org/2000/svg%22) viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🤖</text></svg>">
-    <script src="[https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js](https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js)"></script>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🤖</text></svg>">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <style>
         * { box-sizing: border-box; }
         :root {
@@ -529,7 +529,7 @@
 <div id="toast"></div>
 
 <script>
-    pdfjsLib.GlobalWorkerOptions.workerSrc = '[https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js](https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js)';
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
     const GEMINI_API_KEY = 'AQ.Ab8RN6JP-oM5a54UjwIpM8lLKu5v0gMk5XUePUMukE4wOZQxYw';
 
@@ -1150,13 +1150,13 @@
         return imageParts;
     }
 
-    // JSON・テキストどちらが返ってきても重複なしで1回分に整形する安全パーサー
+    // 重複を完全に排除し、安全にフォーマットするパーサー
     function parseAndFormatEpisodes(rawText, headerPrefix) {
         if (!rawText) return "解析結果を取得できませんでした。";
 
-        let text = rawText.trim();
+        let text = rawText.replace(/```json/gi, '').replace(/```/g, '').replace(/\*\*/g, '').trim();
 
-        // 1. JSON解析トライ（エラーが出てもcatchして安全にフォールバック）
+        // 1. JSONパース試行（安全に例外キャッチ）
         try {
             const jsonMatch = text.match(/\[[\s\S]*\]/);
             if (jsonMatch) {
@@ -1171,12 +1171,10 @@
                 }
             }
         } catch (e) {
-            // JSON parse error時は通常テキスト処理へ
+            // JSON parse error時は安全にテキスト処理へフォールバック
         }
 
-        // 2. テキスト解析フォールバック
-        text = text.replace(/```json/gi, '').replace(/```/g, '').replace(/\*\*/g, '').trim();
-
+        // 2. 行パーサー（1つのブロックのみ抽出し重複を切断）
         const lines = text.split('\n');
         const formattedBlocks = [];
         let count = 0;
@@ -1193,7 +1191,7 @@
                 const num = parseInt(m[1], 10);
                 const title = m[2].trim();
 
-                // 2回目の「1.」または既出表題で即座にループ終了
+                // 番号が1に戻るか、既出の表題が現れたら重複ブロックとして切断
                 if ((num <= count && count > 0) || seenTitles.has(title)) {
                     break;
                 }
@@ -1226,7 +1224,7 @@
     }
 
     async function callGeminiVision(parts) {
-        const mRes = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models?key=$](https://generativelanguage.googleapis.com/v1beta/models?key=$){GEMINI_API_KEY}`);
+        const mRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`);
         const mData = await mRes.json();
         
         if (!mData.models || mData.models.length === 0) {
@@ -1241,7 +1239,7 @@
 
         for (const model of candidateModels) {
             try {
-                const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/$](https://generativelanguage.googleapis.com/v1beta/$){model.name}:generateContent?key=${GEMINI_API_KEY}`, {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/${model.name}:generateContent?key=${GEMINI_API_KEY}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ contents: [{ parts }] })
@@ -1276,7 +1274,7 @@
             const imageParts = await extractPageImagesForAI(startPage, currentPage, 6);
             if (imageParts.length === 0) throw new Error("ページの読み込みに失敗しました。");
 
-            const promptText = `あなたは小説読書アシスタントです。添付された本文ページ画像（P.${startPage}〜P.${currentPage}）を読み取り、この範囲の中で起きた「重要で象徴的なエピソード」を時系列順に【それぞれ表題をつけて最大5〜8個】提示してください。
+            const promptText = `添付された本文ページ画像（P.${startPage}〜P.${currentPage}）を読み取り、この範囲の中で起きた「重要で象徴的なエピソード」を時系列順に【それぞれ表題をつけて最大5〜8個】提示してください。
 
 【出力形式】
 1. 表題
@@ -1286,7 +1284,7 @@
 解説文。
 
 【厳格な指示】
-1. 英語の思考プロセスや下書き、挨拶、同じ文章の繰り返しは一切禁止します。最終的な「1. 表題」から始まる日本語本文のみを1回だけ出力してください。
+1. 下書きや英語の思考メモ、前置き、同じ文章の繰り返しは一切禁止します。最終的な「1. 表題」から始まる日本語本文のみを1回だけ出力してください。
 2. ネタバレは一切書かないでください。`;
 
             const parts = [{ text: promptText }, ...imageParts];

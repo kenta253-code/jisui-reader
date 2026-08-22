@@ -29,7 +29,6 @@
             --ai-badge-bg: #6366f1;
         }
 
-        /* 1. 木目調（落ち着いたウッドブラウン単色） */
         body[data-theme="wood"] {
             --bg-main: #362217;
             --bg-card: #2a1910;
@@ -51,7 +50,6 @@
             --ai-badge-bg: #d97724;
         }
 
-        /* 2. ダーク */
         body[data-theme="dark"] {
             --bg-main: #181818;
             --bg-card: #252525;
@@ -72,7 +70,6 @@
             --ai-badge-bg: #6366f1;
         }
 
-        /* 3. セピア (紙色) */
         body[data-theme="sepia"] {
             --bg-main: #e8dfcf;
             --bg-card: #f2e9db;
@@ -94,7 +91,6 @@
             --ai-badge-bg: #8c5b3e;
         }
 
-        /* 4. ライト */
         body[data-theme="light"] {
             --bg-main: #f5f5f7;
             --bg-card: #ffffff;
@@ -145,45 +141,15 @@
             gap: 5px;
             white-space: nowrap;
         }
-        .btn:hover {
-            background-color: var(--btn-hover);
-        }
-        .btn-primary {
-            background-color: var(--accent-color);
-            color: #ffffff !important;
-            border: none;
-        }
-        .btn-primary:hover {
-            background-color: var(--accent-hover);
-        }
-        .btn-ai {
-            background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
-            color: #ffffff !important;
-            border: none;
-        }
-        .btn-ai:hover {
-            opacity: 0.9;
-        }
-        .btn-bookmark-active {
-            background-color: var(--bookmark-active) !important;
-            color: #ffffff !important;
-            border-color: var(--bookmark-active) !important;
-        }
-        .btn-bookmark-active:hover {
-            background-color: var(--bookmark-active-hover) !important;
-        }
-        .btn-danger {
-            background-color: transparent;
-            color: #ff5c5c;
-            border: 1px solid rgba(255, 92, 92, 0.4);
-            padding: 3px 6px;
-            font-size: 11px;
-            border-radius: 4px;
-        }
-        .btn-danger:hover {
-            background-color: #ff5c5c;
-            color: white;
-        }
+        .btn:hover { background-color: var(--btn-hover); }
+        .btn-primary { background-color: var(--accent-color); color: #ffffff !important; border: none; }
+        .btn-primary:hover { background-color: var(--accent-hover); }
+        .btn-ai { background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); color: #ffffff !important; border: none; }
+        .btn-ai:hover { opacity: 0.9; }
+        .btn-bookmark-active { background-color: var(--bookmark-active) !important; color: #ffffff !important; border-color: var(--bookmark-active) !important; }
+        .btn-bookmark-active:hover { background-color: var(--bookmark-active-hover) !important; }
+        .btn-danger { background-color: transparent; color: #ff5c5c; border: 1px solid rgba(255, 92, 92, 0.4); padding: 3px 6px; font-size: 11px; border-radius: 4px; }
+        .btn-danger:hover { background-color: #ff5c5c; color: white; }
 
         select, input[type="text"] {
             background-color: var(--btn-bg);
@@ -195,9 +161,7 @@
             cursor: pointer;
             outline: none;
         }
-        input[type="text"] {
-            cursor: text;
-        }
+        input[type="text"] { cursor: text; }
 
         #bookshelf-view {
             flex: 1;
@@ -219,22 +183,8 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.15);
             z-index: 10;
         }
-        .shelf-title {
-            font-size: 17px;
-            font-weight: bold;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .ai-pill {
-            font-size: 10px;
-            font-weight: bold;
-            background: linear-gradient(135deg, #6366f1, #a855f7);
-            color: white;
-            padding: 2px 6px;
-            border-radius: 10px;
-            letter-spacing: 0.05em;
-        }
+        .shelf-title { font-size: 17px; font-weight: bold; display: flex; align-items: center; gap: 8px; }
+        .ai-pill { font-size: 10px; font-weight: bold; background: linear-gradient(135deg, #6366f1, #a855f7); color: white; padding: 2px 6px; border-radius: 10px; }
 
         .collection-bar {
             background-color: var(--bg-toolbar);
@@ -260,46 +210,14 @@
             gap: 6px;
             transition: all 0.15s ease;
         }
-        .collection-tab:hover {
-            background-color: var(--btn-hover);
-            color: var(--text-color);
-        }
-        .collection-tab.active {
-            background-color: var(--tab-active-bg);
-            color: var(--tab-active-text);
-            border-color: var(--tab-active-bg);
-        }
-        .collection-tab .tab-count {
-            font-size: 10px;
-            opacity: 0.8;
-        }
-        .btn-add-collection {
-            padding: 5px 10px;
-            font-size: 12px;
-            border-radius: 20px;
-            background: transparent;
-            border: 1px dashed var(--border-color);
-            color: var(--text-sub);
-        }
-        .btn-add-collection:hover {
-            border-color: var(--accent-color);
-            color: var(--accent-color);
-        }
+        .collection-tab:hover { background-color: var(--btn-hover); color: var(--text-color); }
+        .collection-tab.active { background-color: var(--tab-active-bg); color: var(--tab-active-text); border-color: var(--tab-active-bg); }
+        .collection-tab .tab-count { font-size: 10px; opacity: 0.8; }
+        .btn-add-collection { padding: 5px 10px; font-size: 12px; border-radius: 20px; background: transparent; border: 1px dashed var(--border-color); color: var(--text-sub); }
+        .btn-add-collection:hover { border-color: var(--accent-color); color: var(--accent-color); }
 
-        .shelf-container {
-            flex: 1;
-            overflow-y: auto;
-            padding: 24px 20px;
-        }
-
-        .book-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-            gap: 20px 16px;
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-
+        .shelf-container { flex: 1; overflow-y: auto; padding: 24px 20px; }
+        .book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 20px 16px; max-width: 1400px; margin: 0 auto; }
         .book-card {
             background-color: var(--bg-card);
             border-radius: 6px;
@@ -312,115 +230,23 @@
             position: relative;
             border: 1px solid var(--border-color);
         }
-        .book-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 6px 18px rgba(0,0,0,0.35);
-        }
+        .book-card:hover { transform: translateY(-4px); box-shadow: 0 6px 18px rgba(0,0,0,0.35); }
+        .book-cover-wrap { width: 100%; height: 175px; background-color: #111; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .book-cover-wrap img { width: 100%; height: 100%; object-fit: contain; }
+        .book-cover-placeholder { color: #666; font-size: 28px; }
+        .book-info { padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 4px; flex: 1; }
+        .book-title { font-size: 12px; font-weight: 600; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .book-progress-text { font-size: 10px; color: var(--text-sub); margin-top: auto; }
+        .progress-bar-bg { width: 100%; height: 3px; background-color: var(--progress-bg); border-radius: 2px; overflow: hidden; margin-top: 3px; }
+        .progress-bar-fill { height: 100%; background-color: var(--progress-fill); border-radius: 2px; }
+        .card-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; padding-top: 5px; border-top: 1px solid var(--border-color); font-size: 10px; color: var(--text-sub); }
+        .card-action-btn { background: transparent; border: none; color: var(--text-sub); cursor: pointer; padding: 2px 4px; font-size: 11px; border-radius: 3px; }
+        .card-action-btn:hover { color: var(--text-color); background: var(--btn-hover); }
 
-        .book-cover-wrap {
-            width: 100%;
-            height: 175px;
-            background-color: #111;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-            position: relative;
-        }
-        .book-cover-wrap img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-        }
-        .book-cover-placeholder {
-            color: #666;
-            font-size: 28px;
-        }
+        .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 50vh; color: var(--text-sub); text-align: center; gap: 12px; }
+        .empty-state-icon { font-size: 48px; opacity: 0.7; }
 
-        .book-info {
-            padding: 8px 10px 10px;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-            flex: 1;
-        }
-        .book-title {
-            font-size: 12px;
-            font-weight: 600;
-            line-height: 1.35;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-            color: var(--text-color);
-        }
-        .book-progress-text {
-            font-size: 10px;
-            color: var(--text-sub);
-            margin-top: auto;
-        }
-        .progress-bar-bg {
-            width: 100%;
-            height: 3px;
-            background-color: var(--progress-bg);
-            border-radius: 2px;
-            overflow: hidden;
-            margin-top: 3px;
-        }
-        .progress-bar-fill {
-            height: 100%;
-            background-color: var(--progress-fill);
-            border-radius: 2px;
-            transition: width 0.3s ease;
-        }
-        .card-actions {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 6px;
-            padding-top: 5px;
-            border-top: 1px solid var(--border-color);
-            font-size: 10px;
-            color: var(--text-sub);
-        }
-        .card-action-btn {
-            background: transparent;
-            border: none;
-            color: var(--text-sub);
-            cursor: pointer;
-            padding: 2px 4px;
-            font-size: 11px;
-            border-radius: 3px;
-        }
-        .card-action-btn:hover {
-            color: var(--text-color);
-            background: var(--btn-hover);
-        }
-
-        .empty-state {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 50vh;
-            color: var(--text-sub);
-            text-align: center;
-            gap: 12px;
-        }
-        .empty-state-icon {
-            font-size: 48px;
-            opacity: 0.7;
-        }
-
-        #reader-view {
-            flex: 1;
-            display: none;
-            flex-direction: column;
-            height: 100vh;
-            overflow: hidden;
-            position: relative;
-        }
-
+        #reader-view { flex: 1; display: none; flex-direction: column; height: 100vh; overflow: hidden; position: relative; }
         .toolbar {
             height: 50px;
             background-color: var(--bg-toolbar);
@@ -430,82 +256,24 @@
             padding: 0 16px;
             border-bottom: 1px solid var(--border-color);
             z-index: 10;
-            transition: background-color 0.2s ease, transform 0.3s ease;
             gap: 10px;
         }
-        body.fullscreen-mode .toolbar {
-            position: absolute;
-            top: 0; left: 0; right: 0;
-            opacity: 0;
-            transform: translateY(-100%);
-        }
-        body.fullscreen-mode .toolbar:hover {
-            opacity: 1;
-            transform: translateY(0);
-        }
+        body.fullscreen-mode .toolbar { position: absolute; top: 0; left: 0; right: 0; opacity: 0; transform: translateY(-100%); }
+        body.fullscreen-mode .toolbar:hover { opacity: 1; transform: translateY(0); }
+        .toolbar-group { display: flex; align-items: center; gap: 8px; }
+        #readerBookTitle { font-size: 13px; font-weight: 600; max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        #pageInfo { font-size: 13px; min-width: 80px; text-align: center; font-weight: 500; }
 
-        .toolbar-group {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        #readerBookTitle {
-            font-size: 13px;
-            font-weight: 600;
-            max-width: 180px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            color: var(--text-color);
-        }
-
-        #pageInfo {
-            font-size: 13px;
-            min-width: 80px;
-            text-align: center;
-            font-weight: 500;
-        }
-
-        #viewer-container {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            background-color: var(--bg-main);
-            overflow: hidden;
-            transition: background 0.2s ease;
-        }
-
-        #spread {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.4);
-            background-color: #fff;
-            position: relative;
-        }
-        canvas {
-            display: block;
-            background-color: #fff;
-        }
-
-        .click-zone {
-            position: absolute;
-            top: 0; bottom: 0;
-            width: 50%;
-            cursor: pointer;
-            z-index: 5;
-        }
+        #viewer-container { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; background-color: var(--bg-main); overflow: hidden; }
+        #spread { display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 30px rgba(0,0,0,0.4); background-color: #fff; position: relative; }
+        canvas { display: block; background-color: #fff; }
+        .click-zone { position: absolute; top: 0; bottom: 0; width: 50%; cursor: pointer; z-index: 5; }
         #left-zone { left: 0; }
         #right-zone { right: 0; }
 
         .side-drawer {
             position: absolute;
-            top: 50px;
-            right: 0;
-            bottom: 0;
+            top: 50px; right: 0; bottom: 0;
             width: 340px;
             background-color: var(--bg-modal);
             border-left: 1px solid var(--border-color);
@@ -516,27 +284,9 @@
             transform: translateX(100%);
             transition: transform 0.25s ease;
         }
-        .side-drawer.open {
-            transform: translateX(0);
-        }
-
-        .drawer-header {
-            padding: 12px 16px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            border-bottom: 1px solid var(--border-color);
-            font-weight: 600;
-            font-size: 13px;
-        }
-        .drawer-content {
-            flex: 1;
-            overflow-y: auto;
-            padding: 14px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
+        .side-drawer.open { transform: translateX(0); }
+        .drawer-header { padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); font-weight: 600; font-size: 13px; }
+        .drawer-content { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
 
         .bookmark-item {
             background-color: var(--bg-card);
@@ -547,22 +297,10 @@
             align-items: center;
             justify-content: space-between;
             cursor: pointer;
-            transition: all 0.15s ease;
         }
-        .bookmark-item:hover {
-            border-color: var(--accent-color);
-            transform: translateX(-2px);
-        }
-        .bookmark-item-title {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--text-color);
-        }
-        .bookmark-item-date {
-            font-size: 10px;
-            color: var(--text-sub);
-            margin-top: 2px;
-        }
+        .bookmark-item:hover { border-color: var(--accent-color); }
+        .bookmark-item-title { font-size: 12px; font-weight: 600; }
+        .bookmark-item-date { font-size: 10px; color: var(--text-sub); margin-top: 2px; }
 
         .ai-section-box {
             background-color: var(--bg-card);
@@ -573,45 +311,18 @@
             flex-direction: column;
             gap: 10px;
         }
-        .ai-section-title {
-            font-size: 12px;
-            font-weight: 700;
-            color: var(--accent-color);
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .ai-toggle-group {
-            display: flex;
-            background: rgba(0,0,0,0.2);
-            border-radius: 6px;
-            padding: 2px;
-            gap: 4px;
-        }
-        .ai-toggle-btn {
-            flex: 1;
-            padding: 5px;
-            font-size: 11px;
-            font-weight: 600;
-            background: transparent;
-            border: none;
-            color: var(--text-sub);
-            border-radius: 4px;
-            cursor: pointer;
-            transition: 0.15s;
-        }
-        .ai-toggle-btn.active {
-            background: var(--accent-color);
-            color: #fff;
-        }
+        .ai-section-title { font-size: 12px; font-weight: 700; color: var(--accent-color); display: flex; align-items: center; gap: 6px; }
+        .ai-toggle-group { display: flex; background: rgba(0,0,0,0.2); border-radius: 6px; padding: 2px; gap: 4px; }
+        .ai-toggle-btn { flex: 1; padding: 5px; font-size: 11px; font-weight: 600; background: transparent; border: none; color: var(--text-sub); border-radius: 4px; cursor: pointer; }
+        .ai-toggle-btn.active { background: var(--accent-color); color: #fff; }
         .ai-result-box {
             font-size: 12px;
             line-height: 1.6;
             color: var(--text-color);
-            background: rgba(0,0,0,0.15);
+            background: rgba(0,0,0,0.2);
             border-radius: 6px;
             padding: 10px;
-            min-height: 50px;
+            min-height: 60px;
             white-space: pre-wrap;
             border: 1px solid var(--border-color);
         }
@@ -628,10 +339,7 @@
             pointer-events: none;
             transition: opacity 0.2s ease;
         }
-        .modal-overlay.open {
-            opacity: 1;
-            pointer-events: auto;
-        }
+        .modal-overlay.open { opacity: 1; pointer-events: auto; }
         .modal-card {
             background-color: var(--bg-modal);
             border: 1px solid var(--border-color);
@@ -639,58 +347,25 @@
             width: 90%;
             max-width: 420px;
             padding: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
             display: flex;
             flex-direction: column;
             gap: 16px;
         }
-        .modal-title {
-            font-size: 15px;
-            font-weight: bold;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .modal-body {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            font-size: 13px;
-        }
-        .checkbox-list {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            max-height: 200px;
-            overflow-y: auto;
-            border: 1px solid var(--border-color);
-            padding: 10px;
-            border-radius: 6px;
-            background: var(--bg-card);
-        }
-        .checkbox-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            cursor: pointer;
-        }
-        .modal-actions {
-            display: flex;
-            justify-content: flex-end;
-            gap: 8px;
-        }
+        .modal-title { font-size: 15px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        .modal-body { display: flex; flex-direction: column; gap: 12px; font-size: 13px; }
+        .checkbox-list { display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto; border: 1px solid var(--border-color); padding: 10px; border-radius: 6px; background: var(--bg-card); }
+        .checkbox-item { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
 
         #toast {
             position: fixed;
-            bottom: 24px;
-            left: 50%;
+            bottom: 24px; left: 50%;
             transform: translateX(-50%);
             background-color: rgba(20, 20, 20, 0.9);
             color: #fff;
             padding: 9px 20px;
             border-radius: 20px;
             font-size: 13px;
-            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
             z-index: 1000;
             opacity: 0;
             pointer-events: none;
@@ -710,14 +385,7 @@
             color: white;
             gap: 14px;
         }
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid rgba(255,255,255,0.2);
-            border-top-color: var(--accent-color);
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
+        .spinner { width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.2); border-top-color: var(--accent-color); border-radius: 50%; animation: spin 0.8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
@@ -728,7 +396,6 @@
     <div id="loadingText">読み込み中...</div>
 </div>
 
-<!-- ================= 1. 本棚画面 ================= -->
 <div id="bookshelf-view">
     <header class="shelf-header">
         <div class="shelf-title">
@@ -760,7 +427,6 @@
     </div>
 </div>
 
-<!-- ================= モーダル：コレクション所属設定 ================= -->
 <div class="modal-overlay" id="assignModal">
     <div class="modal-card">
         <div class="modal-title">
@@ -768,7 +434,7 @@
             <button class="card-action-btn" onclick="closeAssignModal()">✕</button>
         </div>
         <div class="modal-body">
-            <div id="assignBookTitle" style="font-weight: 600; color: var(--text-color);"></div>
+            <div id="assignBookTitle" style="font-weight: 600;"></div>
             <div>所属させるコレクションにチェックを入れてください：</div>
             <div class="checkbox-list" id="assignCheckboxList"></div>
         </div>
@@ -779,7 +445,6 @@
     </div>
 </div>
 
-<!-- ================= 2. リーダー画面 ================= -->
 <div id="reader-view">
     <div class="toolbar" id="toolbar">
         <div class="toolbar-group">
@@ -788,9 +453,9 @@
         </div>
 
         <div class="toolbar-group">
-            <button class="btn" id="btnToggleBookmark" title="現在のページにしおりを挟む">🔖 しおり</button>
-            <button class="btn" id="btnListBookmarks" title="しおり一覧を開く">📑 しおり (<span id="bookmarkCount">0</span>)</button>
-            <button class="btn btn-ai" id="btnOpenAI" title="AI読書アシスタントを開く">🤖 AI アシスタント</button>
+            <button class="btn" id="btnToggleBookmark">🔖 しおり</button>
+            <button class="btn" id="btnListBookmarks">📑 しおり (<span id="bookmarkCount">0</span>)</button>
+            <button class="btn btn-ai" id="btnOpenAI">🤖 AI アシスタント</button>
 
             <select id="modeSelect">
                 <option value="rtl">右開き (縦書き小説)</option>
@@ -821,7 +486,7 @@
         <div id="bookmarkDrawer" class="side-drawer">
             <div class="drawer-header">
                 <span>📑 挟んだしおり一覧</span>
-                <button class="card-action-btn" id="btnCloseBookmarkDrawer" style="padding: 2px 8px; font-size: 13px;">✕</button>
+                <button class="card-action-btn" id="btnCloseBookmarkDrawer">✕</button>
             </div>
             <div class="drawer-content" id="bookmarkListContainer"></div>
         </div>
@@ -829,7 +494,7 @@
         <div id="aiDrawer" class="side-drawer">
             <div class="drawer-header">
                 <span>🤖 AI 読書アシスタント</span>
-                <button class="card-action-btn" id="btnCloseAIDrawer" style="padding: 2px 8px; font-size: 13px;">✕</button>
+                <button class="card-action-btn" id="btnCloseAIDrawer">✕</button>
             </div>
             <div class="drawer-content">
                 <div class="ai-section-box">
@@ -866,10 +531,8 @@
 <script>
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-    // ===== 組み込み Gemini API 設定 =====
     const GEMINI_API_KEY = 'AQ.Ab8RN6JP-oM5a54UjwIpM8lLKu5v0gMk5XUePUMukE4wOZQxYw';
 
-    // ===== データベース (IndexedDB) 管理 =====
     const DB_NAME = 'JisuiBookShelfDB';
     const DB_VERSION = 1;
     const STORE_NAME = 'books';
@@ -1055,7 +718,7 @@
         addBtn.className = 'collection-tab btn-add-collection';
         addBtn.innerHTML = `＋ 新しい本棚・著者`;
         addBtn.addEventListener('click', () => {
-            const name = prompt('新しいコレクション名（著者名やジャンルなど）を入力してください：');
+            const name = prompt('新しいコレクション名を入力してください：');
             if (name && name.trim()) {
                 const trimmed = name.trim();
                 if (!collections.includes(trimmed)) {
@@ -1104,7 +767,7 @@
                         <div class="progress-bar-fill" style="width: ${progressPercent}%;"></div>
                     </div>
                     <div class="card-actions">
-                        <button class="card-action-btn" title="コレクション仕分け" onclick="event.stopPropagation(); openAssignModal(${book.id})">📁 整理</button>
+                        <button class="card-action-btn" onclick="event.stopPropagation(); openAssignModal(${book.id})">📁 整理</button>
                         <span>🔖 ${bookmarkNum}</span>
                         <button class="btn btn-danger" onclick="event.stopPropagation(); removeBook(${book.id}, '${book.title.replace(/'/g, "\\'")}')">削除</button>
                     </div>
@@ -1130,7 +793,7 @@
         assignCheckboxList.innerHTML = '';
 
         if (collections.length === 0) {
-            assignCheckboxList.innerHTML = '<div style="color:var(--text-sub);">コレクションがありません。「＋ 新しい本棚・著者」から作成してください。</div>';
+            assignCheckboxList.innerHTML = '<div style="color:var(--text-sub);">コレクションがありません。</div>';
         } else {
             const bookCols = targetBookForAssign.collections || [];
             collections.forEach(col => {
@@ -1170,7 +833,7 @@
 
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
-            loadingText.textContent = `本棚に取り込み中 (${i + 1}/${files.length}): ${file.name}`;
+            loadingText.textContent = `取り込み中 (${i + 1}/${files.length}): ${file.name}`;
             try {
                 const arrayBuffer = await file.arrayBuffer();
                 const tempPdf = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
@@ -1185,9 +848,7 @@
                     const ctx = canvas.getContext('2d');
                     await page1.render({ canvasContext: ctx, viewport }).promise;
                     coverData = canvas.toDataURL('image/jpeg', 0.8);
-                } catch (err) {
-                    console.warn("Cover generation failed:", err);
-                }
+                } catch (err) {}
 
                 const title = file.name.replace(/\.pdf$/i, '');
                 const defaultCols = (currentCollection !== 'all') ? [currentCollection] : [];
@@ -1210,7 +871,6 @@
 
                 await saveBook(newBook);
             } catch (err) {
-                console.error("PDF import error:", err);
                 alert(`「${file.name}」の読み込みに失敗しました。`);
             }
         }
@@ -1259,7 +919,6 @@
                 showToast(`前回の続き（P.${pageNum}）から再開しました`);
             }
         } catch (err) {
-            console.error("Failed to open reader:", err);
             alert("本を開けませんでした。");
         } finally {
             loadingOverlay.style.display = 'none';
@@ -1331,7 +990,6 @@
             });
 
             currentBook.bookmarks.sort((a, b) => a.page - b.page);
-
             await saveBook(currentBook);
             updateBookmarkUI();
             renderBookmarkList();
@@ -1346,7 +1004,7 @@
         const bookmarks = currentBook.bookmarks || [];
         if (bookmarks.length === 0) {
             bookmarkListContainer.innerHTML = `
-                <div class="bookmark-empty">
+                <div style="text-align:center; color:var(--text-sub); padding:40px 10px; font-size:13px; line-height:1.6;">
                     しおりがありません。<br>
                     ツールバーの「🔖 しおり」を押して気になるページを保存できます。
                 </div>
@@ -1442,9 +1100,7 @@
         }
     }
 
-    // 本文ページのみ（表紙P.1をスキップ）から画像抽出
     async function extractPageImagesForAI(startPage, endPage, maxSamplePages = 8) {
-        // P.1（表紙）は除外して本文（P.2〜）から抽出
         const actualStart = (startPage === 1 && endPage > 1) ? 2 : startPage;
         const total = endPage - actualStart + 1;
         let targetPages = [];
@@ -1477,9 +1133,7 @@
                         data: base64
                     }
                 });
-            } catch (err) {
-                console.warn(`Failed to render page ${pNum} for AI:`, err);
-            }
+            } catch (err) {}
         }
         return imageParts;
     }
@@ -1508,14 +1162,7 @@
                 if (res.ok) {
                     const data = await res.json();
                     let raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-                    
-                    // 【クリーンアップ処理】英語のメモや前置きを排除し、最終的な日本語あらすじ部分だけを抽出
-                    if (raw.includes('【')) {
-                        raw = raw.substring(raw.indexOf('【'));
-                    }
-                    // *Final Version:* や *Draft* などの文字を取り除く
-                    raw = raw.replace(/\*Final Version:\*/gi, '').trim();
-                    return raw;
+                    return raw.trim() || '解析結果を取得できませんでした。';
                 }
             } catch(e) {
                 continue;
@@ -1542,16 +1189,12 @@
             const imageParts = await extractPageImagesForAI(startPage, currentPage, 6);
             if (imageParts.length === 0) throw new Error("ページの読み込みに失敗しました。");
 
-            // 英語思考や下書きを禁止する厳格な日本語プロンプト
-            const promptText = `あなたは小説読書アシスタントです。添付された本文ページ画像を読み取り、以下の条件に従って直接あらすじのみを出力してください。英語での思考プロセス、下書き、解説、自己添削は一切出力しないでください。
+            const promptText = `あなたは小説読書アシスタントです。添付された本文ページ画像を読み取り、P.${startPage}〜P.${currentPage}のあらすじをまとめてください。
 
-【出力フォーマット】
-【P.${startPage}〜P.${currentPage} のあらすじ】
-（ここに3〜5行程度の簡潔な日本語で、主要な出来事・登場人物の行動・状況の変化を記載する）
-
-【ルール】
-1. P.${currentPage}より先の展開（ネタバレ）は絶対に含めない。
-2. 出力は上記の【P.${startPage}〜P.${currentPage} のあらすじ】から始まる日本語本文のみとすること。`;
+【厳格なルール】
+1. 英語の文章、思考メモ、下書き、自己添削は一切出力せず、日本語の要約文のみを出力してください。
+2. P.${currentPage}より先の展開（ネタバレ）は絶対に書かないでください。
+3. 主要な出来事・登場人物の行動を3〜5行程度の簡潔な日本語で要約してください。`;
 
             const parts = [{ text: promptText }, ...imageParts];
             const resultText = await callGeminiVision(parts);
@@ -1564,8 +1207,7 @@
             aiSummaryResult.textContent = resultText;
             showToast('あらすじを生成・保存しました');
         } catch (err) {
-            console.error("AI Summary Error:", err);
-            aiSummaryResult.textContent = `❌ エラーが発生しました: ${err.message}`;
+            aiSummaryResult.textContent = `❌ エラー: ${err.message}`;
         } finally {
             btn.disabled = false;
         }
@@ -1590,11 +1232,12 @@
 
         try {
             const imageParts = await extractPageImagesForAI(1, currentPage, 8);
-            const promptText = `あなたは小説読書アシスタントです。添付された本文抜粋画像（P.1〜P.${currentPage}）をもとに、「${charName}」という登場人物について教えてください。英語での思考プロセスやメモは一切出力せず、日本語の回答のみを出力してください。
+            const promptText = `あなたは小説読書アシスタントです。添付された本文画像（P.1〜P.${currentPage}）をもとに、「${charName}」という登場人物について教えてください。
 
-【ルール】
-1. P.${currentPage}までの範囲で判明している「立場・職業」「主人公との関係性」「初登場シーンでの特徴」を2〜4行程度の日本語で簡潔に解説してください。
-2. ネタバレは一切書かないでください。`;
+【厳格なルール】
+1. 英語の思考メモは出さず、日本語の回答のみを出力してください。
+2. P.${currentPage}までの範囲での「立場・職業」「主人公との関係性」を2〜4行程度で簡潔に説明してください。
+3. ネタバレは絶対に書かないでください。`;
 
             const parts = [{ text: promptText }, ...imageParts];
             const resultText = await callGeminiVision(parts);
@@ -1606,8 +1249,7 @@
             aiCharacterResult.textContent = resultText;
             showToast('人物解説を取得・保存しました');
         } catch (err) {
-            console.error("AI Character Query Error:", err);
-            aiCharacterResult.textContent = `❌ エラーが発生しました: ${err.message}`;
+            aiCharacterResult.textContent = `❌ エラー: ${err.message}`;
         }
     };
 
@@ -1631,7 +1273,7 @@
         canvas.height = viewport.height;
         canvas.width = viewport.width;
         const ctx = canvas.getContext('2d');
-        await page.render({ canvasContext: ctx, viewport }).promise;
+        await page.render({ canvasContext: ctx, viewport: viewport }).promise;
         return canvas;
     }
 
@@ -1714,7 +1356,7 @@
 
     function toggleFullscreen() {
         if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen().catch(err => console.error(err));
+            document.documentElement.requestFullscreen().catch(err => {});
         } else {
             if (document.exitFullscreen) document.exitFullscreen();
         }
@@ -1785,7 +1427,6 @@
     openDB().then(() => {
         loadBookshelf();
     }).catch(err => {
-        console.error("DB Init Error:", err);
         alert("データベースの初期化に失敗しました。");
     });
 </script>

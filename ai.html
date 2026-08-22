@@ -1150,51 +1150,57 @@
         return imageParts;
     }
 
-    // 重複を完全に排除し、安全にフォーマットするパーサー
+    // 英語インデックスを排除し、完全な日本語エピソードブロックのみを抽出するパーサー
     function parseAndFormatEpisodes(rawText, headerPrefix) {
         if (!rawText) return "解析結果を取得できませんでした。";
 
-        let text = rawText.replace(/```json/gi, '').replace(/```/g, '').replace(/\*\*/g, '').trim();
+        let text = rawText.replace(/\*\*/g, '').trim();
 
-        // 1. JSONパース試行（安全に例外キャッチ）
+        // 1. JSON解析トライ
         try {
             const jsonMatch = text.match(/\[[\s\S]*\]/);
             if (jsonMatch) {
                 const episodes = JSON.parse(jsonMatch[0]);
                 if (Array.isArray(episodes) && episodes.length > 0) {
-                    const formatted = episodes.slice(0, 8).map((ep, idx) => {
-                        const title = (ep.title || '').replace(/^\d+[\.\s、]+/, '').trim();
-                        const detail = (ep.detail || '').trim();
-                        return `${idx + 1}. ${title}\n\n${detail}`;
-                    }).join('\n\n');
-                    return headerPrefix + '\n\n' + formatted;
+                    const validEps = episodes.filter(ep => {
+                        const t = ep.title || '';
+                        // 英語だけのタイトルやCover行は除外
+                        return !/^(Cover|P\.\d+|Image|\d+)/i.test(t) && /[\u3040-\u309F\u4E00-\u9FAF]/.test(t);
+                    });
+                    if (validEps.length > 0) {
+                        const formatted = validEps.slice(0, 8).map((ep, idx) => {
+                            const title = (ep.title || '').replace(/^\d+[\.\s、]+/, '').trim();
+                            const detail = (ep.detail || '').trim();
+                            return `${idx + 1}. ${title}\n\n${detail}`;
+                        }).join('\n\n');
+                        return headerPrefix + '\n\n' + formatted;
+                    }
                 }
             }
-        } catch (e) {
-            // JSON parse error時は安全にテキスト処理へフォールバック
-        }
+        } catch (e) {}
 
-        // 2. 行パーサー（1つのブロックのみ抽出し重複を切断）
+        // 2. 行パーサー（英語インデックス・重複を完全排除）
         const lines = text.split('\n');
         const formattedBlocks = [];
-        let count = 0;
         let curBlock = [];
+        let count = 0;
         const seenTitles = new Set();
 
-        for (const line of lines) {
-            const trimmed = line.trim();
+        for (let i = 0; i < lines.length; i++) {
+            const trimmed = lines[i].trim();
             if (!trimmed) continue;
-            if (/^(Constraint|Image|Draft|Context|Characters|Key Plot|Refinement|Title|Content|Length|No spoilers|Final Version|Okay|\*)/i.test(trimmed)) continue;
 
-            const m = trimmed.match(/^(\d+)[\.\s、\)]\s*(.+)$/);
+            // 英語メタ行・ページ見出し行（1. Cover (P.1) や 2. P.27 (...) 等）を完全に弾く
+            if (/^\d+[\.\s、\)]\s*(Cover|P\.\d+|Image|Strategy|Suspicion|Archery|Changing|Introduction)/i.test(trimmed)) continue;
+            if (/^(Constraint|Image|Draft|Context|Characters|Key Plot|Refinement|Title|Content|Length|No spoilers|Final Version|Okay|\*|```)/i.test(trimmed)) continue;
+
+            // 「1. 日本語表題」を検出（ひらがな・漢字を含む）
+            const m = trimmed.match(/^(\d+)[\.\s、\)]\s*([^\(（\n]+[\u3040-\u309F\u4E00-\u9FAF].*)$/);
             if (m) {
-                const num = parseInt(m[1], 10);
-                const title = m[2].trim();
+                const title = m[2].replace(/\(.*?\)|（.*?）/g, '').trim();
 
-                // 番号が1に戻るか、既出の表題が現れたら重複ブロックとして切断
-                if ((num <= count && count > 0) || seenTitles.has(title)) {
-                    break;
-                }
+                // 既出表題なら終了（重複ブロック防止）
+                if (seenTitles.has(title)) break;
 
                 if (curBlock.length > 0) {
                     formattedBlocks.push(curBlock.join('\n\n'));
@@ -1205,8 +1211,9 @@
                 seenTitles.add(title);
                 curBlock.push(`${count}. ${title}`);
             } else if (count > 0) {
+                // 解説文（日本語3文字以上）
                 const jpMatch = trimmed.match(/[\u3040-\u309F\u4E00-\u9FAF]/g);
-                if (jpMatch && jpMatch.length >= 3) {
+                if (jpMatch && jpMatch.length >= 3 && !/^\d+[\.\s]/.test(trimmed)) {
                     curBlock.push(trimmed);
                 }
             }
@@ -1224,7 +1231,7 @@
     }
 
     async function callGeminiVision(parts) {
-        const mRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`);
+        const mRes = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models?key=$](https://generativelanguage.googleapis.com/v1beta/models?key=$){GEMINI_API_KEY}`);
         const mData = await mRes.json();
         
         if (!mData.models || mData.models.length === 0) {
@@ -1239,7 +1246,7 @@
 
         for (const model of candidateModels) {
             try {
-                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/${model.name}:generateContent?key=${GEMINI_API_KEY}`, {
+                const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/$](https://generativelanguage.googleapis.com/v1beta/$){model.name}:generateContent?key=${GEMINI_API_KEY}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ contents: [{ parts }] })
@@ -1274,18 +1281,18 @@
             const imageParts = await extractPageImagesForAI(startPage, currentPage, 6);
             if (imageParts.length === 0) throw new Error("ページの読み込みに失敗しました。");
 
-            const promptText = `添付された本文ページ画像（P.${startPage}〜P.${currentPage}）を読み取り、この範囲の中で起きた「重要で象徴的なエピソード」を時系列順に【それぞれ表題をつけて最大5〜8個】提示してください。
-
-【出力形式】
-1. 表題
-出来事の具体的な経緯、登場人物の行動や心理、起きた結果を説明した2〜3行の日本語の解説文。
-
-2. 表題
-解説文。
+            const promptText = `添付された本文ページ画像（P.${startPage}〜P.${currentPage}）を読み取り、この範囲の中で起きた「重要で象徴的なエピソード」を時系列順に【日本語の表題をつけて最大5〜8個】提示してください。
 
 【厳格な指示】
-1. 下書きや英語の思考メモ、前置き、同じ文章の繰り返しは一切禁止します。最終的な「1. 表題」から始まる日本語本文のみを1回だけ出力してください。
-2. ネタバレは一切書かないでください。`;
+1. 英語の思考メモ、英語の要約、英語の見出し、英語の翻訳（括弧内の英語）は一切出力しないでください。
+2. 表題・解説ともに【純粋な日本語のみ】で出力してください。
+3. 以下のフォーマットで、エピソード1つにつき「表題」と「2〜3行の具体的な解説文」をセットにして出力してください。
+
+1. （日本語の表題）
+（出来事の具体的な経緯、登場人物の行動や心理、起きた結果を説明した2〜3行の日本語の解説文）
+
+2. （日本語の表題）
+（解説文）`;
 
             const parts = [{ text: promptText }, ...imageParts];
             const rawResult = await callGeminiVision(parts);

@@ -513,7 +513,7 @@
                         </button>
                     </div>
 
-                    <div class="ai-result-box" id="aiQueryResult">質問を入力して「AIに質問する」を押すと、指定した範囲の本文をもとにAIが直接回答します。</div>
+                    <div class="ai-result-box" id="aiQueryResult">質問を入力してクルマの「AIに質問する」を押すと、指定した範囲の本文をもとにAIが直接回答します。</div>
                 </div>
             </div>
         </div>
@@ -1151,38 +1151,25 @@
         return cleaned || text;
     }
 
-    // 安定稼働する公式URL形式（query parameter方式）による通信関数
+    // 公式推奨の直指定モデル（gemini-1.5-flash）による最も安定した通信方式
     async function callGeminiVision(parts) {
-        const models = [
-            'gemini-1.5-flash',
-            'gemini-2.5-flash',
-            'gemini-1.5-pro'
-        ];
+        const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$){GEMINI_API_KEY}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ contents: [{ parts }] })
+        });
 
-        let lastErrMsg = '';
-        for (const model of models) {
-            try {
-                const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/$](https://generativelanguage.googleapis.com/v1beta/models/$){model}:generateContent?key=${GEMINI_API_KEY}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ contents: [{ parts }] })
-                });
-
-                if (res.ok) {
-                    const data = await res.json();
-                    const result = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                    if (result) return result;
-                } else {
-                    const errData = await res.json().catch(() => ({}));
-                    lastErrMsg = errData.error?.message || `HTTP ${res.status}`;
-                }
-            } catch(e) {
-                lastErrMsg = e.message || 'ネットワーク接続エラー';
-            }
+        if (res.ok) {
+            const data = await res.json();
+            const result = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (result) return result;
+        } else {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error?.message || `HTTP ${res.status}`);
         }
-        throw new Error(`AI解析エラー (${lastErrMsg})`);
+        throw new Error('AIからの応答を取得できませんでした。');
     }
 
     // フリー質問送信アクション

@@ -906,6 +906,13 @@
             modeSelect.value = mode;
             readerBookTitle.textContent = currentBook.title;
 
+            // 前回の本の残りを完全リセット
+            aiCharacterInput.value = '';
+            aiCharacterResult.textContent = '人物名を入力して「解説」を押すと、作中での立場や主人公との関係性を簡潔に教えます。';
+            activeSummaryRange = 'recent';
+            document.getElementById('btnSummaryRecent').classList.add('active');
+            document.getElementById('btnSummaryTotal').classList.remove('active');
+
             bookmarkDrawer.classList.remove('open');
             aiDrawer.classList.remove('open');
             bookshelfView.style.display = 'none';
@@ -1100,7 +1107,6 @@
         }
     }
 
-    // 冒頭から現在ページまでを広くサンプリングする画像抽出
     async function extractPageImagesForAI(startPage, endPage, maxSamplePages = 8) {
         const actualStart = (startPage === 1 && endPage > 1) ? 2 : startPage;
         const total = endPage - actualStart + 1;
@@ -1244,7 +1250,6 @@
         }
     };
 
-    // P.1〜現在ページまでの全区間探索 ＋ ハイブリッド人物解説アクション
     window.queryCharacterAction = async function() {
         const charName = aiCharacterInput.value.trim();
         if (!charName) {
@@ -1264,7 +1269,6 @@
 
         try {
             const bookTitle = currentBook.title || '小説・書籍';
-            // 冒頭から現在ページまでを幅広くサンプリング抽出
             const imageParts = await extractPageImagesForAI(1, currentPage, 8);
 
             const promptText = `あなたは小説読書アシスタントです。

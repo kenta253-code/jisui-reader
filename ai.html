@@ -1150,36 +1150,12 @@
         return imageParts;
     }
 
-    // 英語インデックスを排除し、完全な日本語エピソードブロックのみを抽出するパーサー
+    // JSONに依存せず、純粋な日本語エピソードブロックのみを重複なしで安全に抽出するパーサー
     function parseAndFormatEpisodes(rawText, headerPrefix) {
         if (!rawText) return "解析結果を取得できませんでした。";
 
-        let text = rawText.replace(/\*\*/g, '').trim();
+        let text = rawText.replace(/\*\*/g, '').replace(/```[a-z]*/gi, '').trim();
 
-        // 1. JSON解析トライ
-        try {
-            const jsonMatch = text.match(/\[[\s\S]*\]/);
-            if (jsonMatch) {
-                const episodes = JSON.parse(jsonMatch[0]);
-                if (Array.isArray(episodes) && episodes.length > 0) {
-                    const validEps = episodes.filter(ep => {
-                        const t = ep.title || '';
-                        // 英語だけのタイトルやCover行は除外
-                        return !/^(Cover|P\.\d+|Image|\d+)/i.test(t) && /[\u3040-\u309F\u4E00-\u9FAF]/.test(t);
-                    });
-                    if (validEps.length > 0) {
-                        const formatted = validEps.slice(0, 8).map((ep, idx) => {
-                            const title = (ep.title || '').replace(/^\d+[\.\s、]+/, '').trim();
-                            const detail = (ep.detail || '').trim();
-                            return `${idx + 1}. ${title}\n\n${detail}`;
-                        }).join('\n\n');
-                        return headerPrefix + '\n\n' + formatted;
-                    }
-                }
-            }
-        } catch (e) {}
-
-        // 2. 行パーサー（英語インデックス・重複を完全排除）
         const lines = text.split('\n');
         const formattedBlocks = [];
         let curBlock = [];
@@ -1190,16 +1166,16 @@
             const trimmed = lines[i].trim();
             if (!trimmed) continue;
 
-            // 英語メタ行・ページ見出し行（1. Cover (P.1) や 2. P.27 (...) 等）を完全に弾く
+            // 英語見出し・メタ行（Cover, P.27, Constraint等）を除外
             if (/^\d+[\.\s、\)]\s*(Cover|P\.\d+|Image|Strategy|Suspicion|Archery|Changing|Introduction)/i.test(trimmed)) continue;
-            if (/^(Constraint|Image|Draft|Context|Characters|Key Plot|Refinement|Title|Content|Length|No spoilers|Final Version|Okay|\*|```)/i.test(trimmed)) continue;
+            if (/^(Constraint|Image|Draft|Context|Characters|Key Plot|Refinement|Title|Content|Length|No spoilers|Final Version|Okay|\*|\[|\{|\})/i.test(trimmed)) continue;
 
-            // 「1. 日本語表題」を検出（ひらがな・漢字を含む）
+            // 「1. 表題」のパターンを検出（日本語文字を含む）
             const m = trimmed.match(/^(\d+)[\.\s、\)]\s*([^\(（\n]+[\u3040-\u309F\u4E00-\u9FAF].*)$/);
             if (m) {
                 const title = m[2].replace(/\(.*?\)|（.*?）/g, '').trim();
 
-                // 既出表題なら終了（重複ブロック防止）
+                // 2周目の重複（既出の表題または番号が戻った場合）は切断して終了
                 if (seenTitles.has(title)) break;
 
                 if (curBlock.length > 0) {
@@ -1211,7 +1187,7 @@
                 seenTitles.add(title);
                 curBlock.push(`${count}. ${title}`);
             } else if (count > 0) {
-                // 解説文（日本語3文字以上）
+                // 解説文
                 const jpMatch = trimmed.match(/[\u3040-\u309F\u4E00-\u9FAF]/g);
                 if (jpMatch && jpMatch.length >= 3 && !/^\d+[\.\s]/.test(trimmed)) {
                     curBlock.push(trimmed);
@@ -1283,16 +1259,18 @@
 
             const promptText = `添付された本文ページ画像（P.${startPage}〜P.${currentPage}）を読み取り、この範囲の中で起きた「重要で象徴的なエピソード」を時系列順に【日本語の表題をつけて最大5〜8個】提示してください。
 
+【出力形式】
+1. 表題（見出し）
+出来事の具体的な経緯、登場人物の行動や心理、起きた結果を説明した2〜3行の日本語の解説文。
+
+2. 表題（見出し）
+解説文。
+
 【厳格な指示】
 1. 英語の思考メモ、英語の要約、英語の見出し、英語の翻訳（括弧内の英語）は一切出力しないでください。
 2. 表題・解説ともに【純粋な日本語のみ】で出力してください。
-3. 以下のフォーマットで、エピソード1つにつき「表題」と「2〜3行の具体的な解説文」をセットにして出力してください。
-
-1. （日本語の表題）
-（出来事の具体的な経緯、登場人物の行動や心理、起きた結果を説明した2〜3行の日本語の解説文）
-
-2. （日本語の表題）
-（解説文）`;
+3. 同じ文章やエピソードを繰り返して出力しないでください。
+4. ネタバレは一切書かないでください。`;
 
             const parts = [{ text: promptText }, ...imageParts];
             const rawResult = await callGeminiVision(parts);
@@ -1346,12 +1324,7 @@
             const parts = [{ text: promptText }, ...imageParts];
             const rawResult = await callGeminiVision(parts);
             
-            let cleaned = rawResult.replace(/\*\*/g, '').trim();
-            const jsonMatch = cleaned.match(/\{[\s\S]*"summary"[\s\S]*:[\s\S]*"([^"]+)"[\s\S]*\}/);
-            if (jsonMatch && jsonMatch[1]) {
-                cleaned = jsonMatch[1].replace(/\\n/g, '\n').trim();
-            }
-
+            let cleaned = rawResult.replace(/\*\*/g, '').replace(/```[a-z]*/gi, '').trim();
             const resultText = `【${charName} について】\n\n${cleaned}`;
 
             if (!currentBook.aiCharacters) currentBook.aiCharacters = {};

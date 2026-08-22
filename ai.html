@@ -541,7 +541,6 @@
             gap: 12px;
         }
 
-        /* しおりアイテム */
         .bookmark-item {
             background-color: var(--bg-card);
             border: 1px solid var(--border-color);
@@ -754,7 +753,6 @@
         </div>
     </header>
 
-    <!-- Kindle風 コレクション（グループ）タブ -->
     <div class="collection-bar" id="collectionBar"></div>
 
     <div class="shelf-container">
@@ -825,7 +823,6 @@
         <div class="click-zone" id="left-zone"></div>
         <div class="click-zone" id="right-zone"></div>
 
-        <!-- 1. しおりドロワー -->
         <div id="bookmarkDrawer" class="side-drawer">
             <div class="drawer-header">
                 <span>📑 挟んだしおり一覧</span>
@@ -834,14 +831,12 @@
             <div class="drawer-content" id="bookmarkListContainer"></div>
         </div>
 
-        <!-- 2. AI アシスタント ドロワー -->
         <div id="aiDrawer" class="side-drawer">
             <div class="drawer-header">
                 <span>🤖 AI 読書アシスタント</span>
                 <button class="card-action-btn" id="btnCloseAIDrawer" style="padding: 2px 8px; font-size: 13px;">✕</button>
             </div>
             <div class="drawer-content">
-                <!-- セクションA: あらすじ振り返り -->
                 <div class="ai-section-box">
                     <div class="ai-section-title">
                         <span>📖 これまでのあらすじ要約</span>
@@ -856,7 +851,6 @@
                     <div class="ai-result-box" id="aiSummaryResult">「あらすじを生成」を押すと、ネタバレなしでここまでの流れを3〜5行で要約します。</div>
                 </div>
 
-                <!-- セクションB: これ誰だっけ？ 人物メモ -->
                 <div class="ai-section-box">
                     <div class="ai-section-title">
                         <span>👥 「この人誰だっけ？」人物メモ</span>
@@ -948,7 +942,6 @@
         });
     }
 
-    // ===== コレクション（本棚・カテゴリ）管理 =====
     let collections = JSON.parse(localStorage.getItem('jisui_collections') || '["小説", "ミステリー", "ビジネス"]');
     let currentCollection = localStorage.getItem('jisui_active_collection') || 'all';
 
@@ -956,7 +949,6 @@
         localStorage.setItem('jisui_collections', JSON.stringify(collections));
     }
 
-    // ===== UI 要素 =====
     const bookshelfView = document.getElementById('bookshelf-view');
     const readerView = document.getElementById('reader-view');
     const bookGrid = document.getElementById('bookGrid');
@@ -981,7 +973,6 @@
     const leftZone = document.getElementById('left-zone');
     const rightZone = document.getElementById('right-zone');
 
-    // しおり / AIドロワー関連UI
     const btnToggleBookmark = document.getElementById('btnToggleBookmark');
     const btnListBookmarks = document.getElementById('btnListBookmarks');
     const bookmarkCount = document.getElementById('bookmarkCount');
@@ -995,21 +986,18 @@
     const aiSummaryResult = document.getElementById('aiSummaryResult');
     const aiCharacterInput = document.getElementById('aiCharacterInput');
     const aiCharacterResult = document.getElementById('aiCharacterResult');
-    let activeSummaryRange = 'recent'; // 'recent' or 'total'
+    let activeSummaryRange = 'recent';
 
-    // モーダル
     const assignModal = document.getElementById('assignModal');
     const assignBookTitle = document.getElementById('assignBookTitle');
     const assignCheckboxList = document.getElementById('assignCheckboxList');
     let targetBookForAssign = null;
 
-    // リーダー状態
     let currentBook = null;
     let pdfDoc = null;
     let pageNum = 1;
     let mode = 'rtl';
 
-    // ===== テーマ同期 =====
     function applyTheme(theme) {
         document.body.setAttribute('data-theme', theme);
         shelfThemeSelect.value = theme;
@@ -1028,7 +1016,6 @@
         setTimeout(() => toast.classList.remove('show'), 3000);
     }
 
-    // ===== コレクションタブの描画 =====
     async function renderCollectionTabs(allBooks) {
         collectionBar.innerHTML = '';
 
@@ -1089,7 +1076,6 @@
         collectionBar.appendChild(addBtn);
     }
 
-    // ===== 本棚グリッド描画 =====
     function renderBookGrid(allBooks) {
         bookGrid.innerHTML = '';
 
@@ -1141,7 +1127,6 @@
         renderBookGrid(books);
     }
 
-    // ===== コレクション所属モーダル =====
     window.openAssignModal = async function(bookId) {
         targetBookForAssign = await getBook(bookId);
         if (!targetBookForAssign) return;
@@ -1182,7 +1167,6 @@
         showToast('コレクションを更新しました');
     };
 
-    // ===== 本の追加 =====
     shelfFileInput.addEventListener('change', async (e) => {
         const files = Array.from(e.target.files);
         if (files.length === 0) return;
@@ -1223,8 +1207,8 @@
                     mode: 'rtl',
                     bookmarks: [],
                     collections: defaultCols,
-                    aiSummaries: {}, // キャッシュ用
-                    aiCharacters: {}, // キャッシュ用
+                    aiSummaries: {},
+                    aiCharacters: {},
                     addedAt: Date.now(),
                     lastReadAt: Date.now()
                 };
@@ -1250,7 +1234,6 @@
         }
     };
 
-    // ===== リーダーを開く =====
     async function openReader(bookId) {
         loadingOverlay.style.display = 'flex';
         loadingText.textContent = '本を開いています...';
@@ -1301,7 +1284,6 @@
         await loadBookshelf();
     });
 
-    // ===== しおり機能 =====
     function getCurrentVisiblePages() {
         if (pageNum === 1) return [1];
         const p1 = pageNum;
@@ -1425,7 +1407,6 @@
         bookmarkDrawer.classList.remove('open');
     });
 
-    // ===== AI アシスタント関連ロジック =====
     btnOpenAI.addEventListener('click', () => {
         bookmarkDrawer.classList.remove('open');
         updateAIDrawerCache();
@@ -1448,7 +1429,6 @@
         if (activeSummaryRange === 'total') {
             return `total_p${currentPage}`;
         } else {
-            // 前回のしおり位置を探す
             const bms = (currentBook.bookmarks || []).filter(b => b.page < currentPage);
             const prevPage = bms.length > 0 ? bms[bms.length - 1].page : 1;
             return `recent_p${prevPage}_to_p${currentPage}`;
@@ -1467,7 +1447,6 @@
         }
     }
 
-    // 複数ページから画像サムネイル/テキストを抽出してAIへ送信
     async function extractPageImagesForAI(startPage, endPage, maxSamplePages = 8) {
         const total = endPage - startPage + 1;
         let targetPages = [];
@@ -1485,7 +1464,7 @@
         for (const pNum of targetPages) {
             try {
                 const page = await pdfDoc.getPage(pNum);
-                const viewport = page.getViewport({ scale: 0.8 }); // 高解像度すぎずOCRに適したサイズ
+                const viewport = page.getViewport({ scale: 0.8 });
                 const canvas = document.createElement('canvas');
                 canvas.width = viewport.width;
                 canvas.height = viewport.height;
@@ -1506,23 +1485,39 @@
         return imageParts;
     }
 
-    // AI API 呼び出し汎用関数
+    // Googleから動的に有効モデルを取得して自動フォールバック実行する関数
     async function callGeminiVision(parts) {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-        const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts }] })
-        });
-        if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            throw new Error(errData.error?.message || `API Error: ${res.status}`);
+        const mRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`);
+        const mData = await mRes.json();
+        
+        if (!mData.models || mData.models.length === 0) {
+            throw new Error('利用可能なGeminiモデルが見つかりません。');
         }
-        const data = await res.json();
-        return data.candidates?.[0]?.content?.parts?.[0]?.text || '解析結果を取得できませんでした。';
+
+        const candidateModels = mData.models.filter(m => 
+            m.supportedGenerationMethods && 
+            m.supportedGenerationMethods.includes('generateContent') && 
+            !m.name.includes('embedding')
+        );
+
+        for (const model of candidateModels) {
+            try {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/${model.name}:generateContent?key=${GEMINI_API_KEY}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts }] })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    return data.candidates?.[0]?.content?.parts?.[0]?.text || '解析結果を取得できませんでした。';
+                }
+            } catch(e) {
+                continue;
+            }
+        }
+        throw new Error('利用可能なGeminiモデルでの解析に失敗しました。');
     }
 
-    // あらすじ生成アクション
     window.generateSummaryAction = async function() {
         if (!pdfDoc || !currentBook) return;
 
@@ -1565,7 +1560,6 @@
         }
     };
 
-    // 人物解説アクション
     window.queryCharacterAction = async function() {
         const charName = aiCharacterInput.value.trim();
         if (!charName) {
@@ -1584,7 +1578,6 @@
         aiCharacterResult.textContent = `「${charName}」の情報を現在ページまでで探索中... ⏳`;
 
         try {
-            // P.1 から現在ページまでの抜粋画像
             const imageParts = await extractPageImagesForAI(1, currentPage, 8);
             const promptText = `あなたは小説読書アシスタントです。添付された小説の抜粋画像（P.1〜P.${currentPage}まで）をもとに、「${charName}」という登場人物について教えてください。
 【条件】
@@ -1607,7 +1600,6 @@
         }
     };
 
-    // ===== 見開き描画ロジック =====
     modeSelect.addEventListener('change', (e) => {
         mode = e.target.value;
         if (currentBook) {

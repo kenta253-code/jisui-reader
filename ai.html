@@ -1107,8 +1107,8 @@
             aiSummaryResult.textContent = currentBook.aiSummaries[key];
         } else {
             aiSummaryResult.textContent = activeSummaryRange === 'recent' 
-                ? '「エピソードを抽出」を押すと、直前のしおり位置から現在までの出来事を箇条書きで整理します。'
-                : '「エピソードを抽出」を押すと、冒頭から現在までの主な出来事を箇条書きで整理します。';
+                ? '「エピソードを抽出」を押すと、直前のしおり位置から現在までの重要な出来事を整理して表示します。'
+                : '「エピソードを抽出」を押すと、冒頭から現在までの主な出来事を整理して表示します。';
         }
     }
 
@@ -1150,6 +1150,7 @@
         return imageParts;
     }
 
+    // 抽出されたエピソードを最大10項目までに整形するクリーンアップ
     function cleanAIResponse(rawText, fallbackPrefix = "") {
         if (!rawText) return "解析結果を取得できませんでした。";
 
@@ -1164,7 +1165,6 @@
                 continue;
             }
 
-            // 省略記号やプレースホルダー行（出来事1など）を排除
             if (/^[・\-\s\.\…\(\)（）出来事\d]+$/.test(trimmed)) {
                 continue;
             }
@@ -1180,8 +1180,11 @@
             }
         }
 
-        if (japaneseLines.length > 0) {
-            return (fallbackPrefix ? fallbackPrefix + "\n" : "") + japaneseLines.join('\n');
+        // 最大10項目までに柔軟に制限
+        const limitedLines = japaneseLines.slice(0, 10);
+
+        if (limitedLines.length > 0) {
+            return (fallbackPrefix ? fallbackPrefix + "\n" : "") + limitedLines.join('\n');
         }
 
         return rawText.trim();
@@ -1219,7 +1222,7 @@
         throw new Error('利用可能なGeminiモデルでの解析に失敗しました。');
     }
 
-    // 主要エピソード抽出アクション
+    // 主要エピソード抽出アクション（最大10項目）
     window.generateSummaryAction = async function() {
         if (!pdfDoc || !currentBook) return;
 
@@ -1230,7 +1233,7 @@
             startPage = bms.length > 0 ? bms[bms.length - 1].page : (currentPage > 2 ? 2 : 1);
         }
 
-        aiSummaryResult.textContent = `P.${startPage} 〜 P.${currentPage} を探索して出来事を抽出中... ⏳`;
+        aiSummaryResult.textContent = `P.${startPage} 〜 P.${currentPage} を探索中... ⏳`;
         const btn = document.getElementById('btnGenerateSummary');
         btn.disabled = true;
 
@@ -1238,12 +1241,13 @@
             const imageParts = await extractPageImagesForAI(startPage, currentPage, 6);
             if (imageParts.length === 0) throw new Error("ページの読み込みに失敗しました。");
 
-            const promptText = `添付された本文ページ画像（P.${startPage}〜P.${currentPage}）を読み取り、この範囲で実際に起きている出来事や登場人物の行動を、具体的に3〜4行の日本語の箇条書き（・から始まる行）で出力してください。
+            const promptText = `添付された本文ページ画像（P.${startPage}〜P.${currentPage}）を読み取り、この範囲で起きた主要な出来事・エピソードを、重要度に応じて【5つ〜最大10個程度】の箇条書き（行頭に・を付ける）で出力してください。
 
 【厳格な指示】
-1. 「（出来事1）」「...」などのプレースホルダーや省略記号は絶対に使わず、本文に書かれている具体的な人名や起きた事実を文章にしてください。
-2. ネタバレは一切書かないでください。
-3. 英語の思考メモは含めず、日本語の箇条書きのみを出力してください。`;
+1. 本文に書かれている具体的な人物名や起きた事実・行動を明確に記述してください。
+2. 10個を超える長すぎる出力は避け、重要な出来事に絞り込んでください。
+3. ネタバレは一切書かないでください。
+4. 英語の思考メモや挨拶は含めず、日本語の箇条書きのみを出力してください。`;
 
             const parts = [{ text: promptText }, ...imageParts];
             const rawResult = await callGeminiVision(parts);
@@ -1255,7 +1259,7 @@
             await saveBook(currentBook);
 
             aiSummaryResult.textContent = resultText;
-            showToast('主要エピソードを抽出・保存しました');
+            showToast('主要エピソードを更新しました');
         } catch (err) {
             aiSummaryResult.textContent = `❌ エラー: ${err.message}`;
         } finally {
@@ -1289,7 +1293,7 @@
 添付された本文画像（P.1〜P.${currentPage}の抜粋）および作品設定をもとに、「${charName}」について解説してください。
 
 【厳格な指示】
-1. P.${currentPage}までの範囲で作中に登場・言及されている「立場・職業・身分」「主人公との関係性」「どのような人物か」を2〜4行程度の自然な日本語で解説してください。
+1. P.${currentPage}までの範囲で作中に登場・言及されている「立場・職業・身分」「主人公との関係性」「どのような人物か」を2〜4行程度の自然な日本語で簡潔に解説してください。
 2. もし画像内に直接の記述が少ない場合でも、「画像に見当たらない」等のメタ発言は絶対に書かず、作品のジャンル・時代背景・文脈から推測される役割を自然に説明してください。
 3. ネタバレは一切書かないでください。
 4. 英語の思考メモは含めず、日本語の解説文のみを出力してください。`;

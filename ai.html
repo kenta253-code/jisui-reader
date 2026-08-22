@@ -519,7 +519,7 @@
                         <input type="text" id="aiCharacterInput" placeholder="人物名（例: 門番, 板倉勝静）" style="flex: 1; font-size: 12px; padding: 6px 8px;">
                         <button class="btn btn-primary" style="font-size: 12px;" onclick="queryCharacterAction()">解説</button>
                     </div>
-                    <div class="ai-result-box" id="aiCharacterResult">人物名を入力して「解説」を押すと、立場・主人公との関係・エピソードを整理して教えます。</div>
+                    <div class="ai-result-box" id="aiCharacterResult">人物名を入力して「解説」を押すと、主人公との関係性や象徴的なエピソードをまとめて教えます。</div>
                 </div>
             </div>
         </div>
@@ -676,7 +676,7 @@
 
     function resetAIPanel() {
         aiCharacterInput.value = '';
-        aiCharacterResult.textContent = '人物名を入力して「解説」を押すと、立場・主人公との関係・エピソードを整理して教えます。';
+        aiCharacterResult.textContent = '人物名を入力して「解説」を押すと、主人公との関係性や象徴的なエピソードをまとめて教えます。';
         activeSummaryRange = 'recent';
         document.getElementById('btnSummaryRecent').classList.add('active');
         document.getElementById('btnSummaryTotal').classList.remove('active');
@@ -1150,7 +1150,7 @@
         return imageParts;
     }
 
-    // エピソード抽出の安全な整形処理（表題＋解説を1回分のみ抽出）
+    // エピソード抽出の整形処理
     function cleanEpisodeResponse(rawText, headerPrefix) {
         if (!rawText) return "解析結果を取得できませんでした。";
 
@@ -1175,7 +1175,7 @@
                 const jpCount = (title.match(/[\u3040-\u309F\u4E00-\u9FAF]/g) || []).length;
 
                 if (jpCount >= 2 && !/^(Cover|P\.\d+|Image)/i.test(title)) {
-                    if (seenTitles.has(title.substring(0, 8))) break; // 重複ブロック防止
+                    if (seenTitles.has(title.substring(0, 8))) break;
 
                     if (curBlock.length > 0) {
                         formattedBlocks.push(curBlock.join('\n\n'));
@@ -1208,20 +1208,19 @@
         return headerPrefix + '\n\n' + text;
     }
 
-    // 人物解説の整形処理（立場・関係性・エピソードの3点を綺麗に抽出）
+    // 人物解説の整形処理（関係性とエピソードを綺麗に1つのまとまりに整理）
     function cleanCharacterResponse(rawText, headerPrefix) {
         if (!rawText) return "解説を取得できませんでした。";
 
         let text = rawText.replace(/\*\*/g, '').trim();
         const lines = text.split('\n');
         const validLines = [];
-        const seenFirstWords = new Set();
+        const seenWords = new Set();
 
         for (const rawLine of lines) {
             let line = rawLine.trim();
             if (!line) continue;
 
-            // 英語メタ行・本文抜粋引用（"〜"）を除外
             if (/^(Constraint|Image|Draft|Context|Characters|Key Plot|Refinement|Title|Content|Length|No spoilers|Final Version|Okay|\*|```)/i.test(line)) {
                 continue;
             }
@@ -1229,20 +1228,18 @@
                 continue;
             }
 
-            // 見出しラベル等の整形
             line = line.replace(/^[・\-\s]+/, '');
             const jpCount = (line.match(/[\u3040-\u309F\u4E00-\u9FAF]/g) || []).length;
             if (jpCount >= 6 && !line.startsWith('【')) {
                 const startWord = line.substring(0, 10);
-                if (!seenFirstWords.has(startWord)) {
-                    seenFirstWords.add(startWord);
-                    validLines.push(line.startsWith('・') ? line : '・' + line);
+                if (!seenWords.has(startWord)) {
+                    seenWords.add(startWord);
+                    validLines.push(line);
                 }
             }
         }
 
         if (validLines.length > 0) {
-            // 最大3項目（立場、関係、エピソード）にまとめて表示
             return headerPrefix + '\n\n' + validLines.slice(0, 3).join('\n\n');
         }
 
@@ -1347,7 +1344,7 @@
         }
     };
 
-    // 人物解説アクション（立場・関係性・エピソードの3点を抽出）
+    // 人物解説アクション（ご指定のプロンプト形式を適用）
     window.queryCharacterAction = async function() {
         const charName = aiCharacterInput.value.trim();
         if (!charName) {
@@ -1370,17 +1367,13 @@
 調査対象の人物名：『${charName}』
 現在の読書位置：P.${currentPage}まで
 
-添付された本文画像（P.1〜P.${currentPage}の抜粋）をもとに、「${charName}」について以下の3点をそれぞれ1〜2行で簡潔に整理して出力してください。
-
-【出力フォーマット】
-・立場・役割：作中での身分や職業、どのような存在か
-・主人公との関係：主人公との関係性や接し方
-・主なエピソード：P.${currentPage}までに起きたこの人物に関わる印象的な場面や行動
+添付された本文画像（P.1〜P.${currentPage}の抜粋）および作品設定をもとに、この人物「${charName}」の文中での主人公との関係性や、この人物の象徴的なエピソード・行動をまとめて簡潔に記載してください。
 
 【厳格な指示】
-1. 本文の引用（セリフ等の抜き出し）や同じ内容の言い換えの繰り返しは一切禁止します。
-2. ネタバレは一切書かないでください。
-3. 英語の思考メモは含めず、上記の3行の日本語のみを出力してください。`;
+1. 主人公との関係性、および作中で印象的な出来事や行動・役割がひと目でわかるように、2〜4行程度の自然な日本語でまとめてください。
+2. 本文の長文引用や同じ内容の言い換えの繰り返しは一切禁止します。
+3. ネタバレは一切書かないでください。
+4. 英語の思考メモや挨拶は含めず、日本語の解説文のみを出力してください。`;
 
             const parts = [{ text: promptText }, ...imageParts];
             const rawResult = await callGeminiVision(parts);

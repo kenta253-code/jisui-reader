@@ -508,7 +508,7 @@
                     <button class="btn btn-primary" id="btnGenerateSummary" style="font-size: 12px; justify-content: center;" onclick="generateSummaryAction()">
                         ✨ エピソードを抽出・更新
                     </button>
-                    <div class="ai-result-box" id="aiSummaryResult">「エピソードを抽出」を押すと、起きた出来事を箇条書きで分かりやすく整理します。</div>
+                    <div class="ai-result-box" id="aiSummaryResult">「エピソードを抽出」を押すと、起きた出来事を表題付きで分かりやすく整理します。</div>
                 </div>
 
                 <div class="ai-section-box">
@@ -516,10 +516,10 @@
                         <span>👥 「この人誰だっけ？」人物メモ</span>
                     </div>
                     <div style="display: flex; gap: 6px;">
-                        <input type="text" id="aiCharacterInput" placeholder="人物名（例: 板倉勝静, 官兵衛）" style="flex: 1; font-size: 12px; padding: 6px 8px;">
+                        <input type="text" id="aiCharacterInput" placeholder="人物名（例: 門番, 板倉勝静）" style="flex: 1; font-size: 12px; padding: 6px 8px;">
                         <button class="btn btn-primary" style="font-size: 12px;" onclick="queryCharacterAction()">解説</button>
                     </div>
-                    <div class="ai-result-box" id="aiCharacterResult">人物名を入力して「解説」を押すと、作中での立場や主人公との関係性を簡潔に教えます。</div>
+                    <div class="ai-result-box" id="aiCharacterResult">人物名を入力して「解説」を押すと、立場・主人公との関係・エピソードを整理して教えます。</div>
                 </div>
             </div>
         </div>
@@ -676,11 +676,11 @@
 
     function resetAIPanel() {
         aiCharacterInput.value = '';
-        aiCharacterResult.textContent = '人物名を入力して「解説」を押すと、作中での立場や主人公との関係性を簡潔に教えます。';
+        aiCharacterResult.textContent = '人物名を入力して「解説」を押すと、立場・主人公との関係・エピソードを整理して教えます。';
         activeSummaryRange = 'recent';
         document.getElementById('btnSummaryRecent').classList.add('active');
         document.getElementById('btnSummaryTotal').classList.remove('active');
-        aiSummaryResult.textContent = '「エピソードを抽出」を押すと、起きた出来事を箇条書きで分かりやすく整理します。';
+        aiSummaryResult.textContent = '「エピソードを抽出」を押すと、起きた出来事を表題付きで分かりやすく整理します。';
     }
 
     async function renderCollectionTabs(allBooks) {
@@ -1208,29 +1208,42 @@
         return headerPrefix + '\n\n' + text;
     }
 
-    // 人物解説の安全な整形処理（重複・多段落出力を1つに厳選）
+    // 人物解説の整形処理（立場・関係性・エピソードの3点を綺麗に抽出）
     function cleanCharacterResponse(rawText, headerPrefix) {
         if (!rawText) return "解説を取得できませんでした。";
 
         let text = rawText.replace(/\*\*/g, '').trim();
-        const paragraphs = text.split(/\n\s*\n|\n/);
-        const validParagraphs = [];
+        const lines = text.split('\n');
+        const validLines = [];
+        const seenFirstWords = new Set();
 
-        for (const p of paragraphs) {
-            let line = p.trim().replace(/^[\*\-\・\s]+/, '');
+        for (const rawLine of lines) {
+            let line = rawLine.trim();
             if (!line) continue;
+
+            // 英語メタ行・本文抜粋引用（"〜"）を除外
             if (/^(Constraint|Image|Draft|Context|Characters|Key Plot|Refinement|Title|Content|Length|No spoilers|Final Version|Okay|\*|```)/i.test(line)) {
                 continue;
             }
+            if (/^["'「].*["'」]$/.test(line) && line.length < 50) {
+                continue;
+            }
+
+            // 見出しラベル等の整形
+            line = line.replace(/^[・\-\s]+/, '');
             const jpCount = (line.match(/[\u3040-\u309F\u4E00-\u9FAF]/g) || []).length;
-            if (jpCount >= 10 && !line.startsWith('【')) {
-                validParagraphs.push(line);
+            if (jpCount >= 6 && !line.startsWith('【')) {
+                const startWord = line.substring(0, 10);
+                if (!seenFirstWords.has(startWord)) {
+                    seenFirstWords.add(startWord);
+                    validLines.push(line.startsWith('・') ? line : '・' + line);
+                }
             }
         }
 
-        if (validParagraphs.length > 0) {
-            // 最もまとまっている最初の段落を採用
-            return headerPrefix + '\n\n' + validParagraphs[0];
+        if (validLines.length > 0) {
+            // 最大3項目（立場、関係、エピソード）にまとめて表示
+            return headerPrefix + '\n\n' + validLines.slice(0, 3).join('\n\n');
         }
 
         return headerPrefix + '\n\n' + text;
@@ -1238,35 +1251,48 @@
 
     // 動的モデル検出による安定通信
     async function callGeminiVision(parts) {
-        const mRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`);
-        const mData = await mRes.json();
-        
-        if (!mData.models || mData.models.length === 0) {
-            throw new Error('利用可能なGeminiモデルが見つかりません。');
-        }
+        let candidateModels = [];
 
-        const candidateModels = mData.models.filter(m => 
-            m.supportedGenerationMethods && 
-            m.supportedGenerationMethods.includes('generateContent') && 
-            !m.name.includes('embedding')
-        );
+        try {
+            const mRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`);
+            if (mRes.ok) {
+                const mData = await mRes.json();
+                if (mData && mData.models) {
+                    candidateModels = mData.models.filter(m => 
+                        m.supportedGenerationMethods && 
+                        m.supportedGenerationMethods.includes('generateContent') && 
+                        !m.name.includes('embedding')
+                    );
+                }
+            }
+        } catch (e) {}
+
+        if (candidateModels.length === 0) {
+            candidateModels = [
+                { name: 'models/gemini-1.5-flash' },
+                { name: 'models/gemini-2.0-flash' },
+                { name: 'models/gemini-1.5-pro' }
+            ];
+        }
 
         for (const model of candidateModels) {
             try {
-                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/${model.name}:generateContent?key=${GEMINI_API_KEY}`, {
+                const endpointName = model.name.startsWith('models/') ? model.name : `models/${model.name}`;
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/${endpointName}:generateContent?key=${GEMINI_API_KEY}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ contents: [{ parts }] })
                 });
                 if (res.ok) {
                     const data = await res.json();
-                    return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                    const result = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (result) return result;
                 }
             } catch(e) {
                 continue;
             }
         }
-        throw new Error('利用可能なGeminiモデルでの解析に失敗しました。');
+        throw new Error('Gemini APIでの解析に失敗しました。時間をおいて再試行してください。');
     }
 
     // 主要エピソード抽出アクション
@@ -1321,7 +1347,7 @@
         }
     };
 
-    // 人物解説アクション
+    // 人物解説アクション（立場・関係性・エピソードの3点を抽出）
     window.queryCharacterAction = async function() {
         const charName = aiCharacterInput.value.trim();
         if (!charName) {
@@ -1344,13 +1370,17 @@
 調査対象の人物名：『${charName}』
 現在の読書位置：P.${currentPage}まで
 
-添付された本文画像（P.1〜P.${currentPage}の抜粋）および作品設定をもとに、「${charName}」について解説してください。
+添付された本文画像（P.1〜P.${currentPage}の抜粋）をもとに、「${charName}」について以下の3点をそれぞれ1〜2行で簡潔に整理して出力してください。
+
+【出力フォーマット】
+・立場・役割：作中での身分や職業、どのような存在か
+・主人公との関係：主人公との関係性や接し方
+・主なエピソード：P.${currentPage}までに起きたこの人物に関わる印象的な場面や行動
 
 【厳格な指示】
-1. P.${currentPage}までの範囲で作中に登場・言及されている「立場・職業・身分」「主人公との関係性」「どのような人物か」を2〜3行程度の自然な日本語で簡潔に1段落で解説してください。
-2. もし画像内に直接の記述が少ない場合でも、「画像に見当たらない」等のメタ発言は絶対に書かず、作品のジャンル・時代背景・文脈から推測される役割を自然に説明してください。
-3. ネタバレは一切書かないでください。
-4. 英語の思考メモや同じ文章の繰り返しは含めず、日本語の解説文のみを1回だけ出力してください。`;
+1. 本文の引用（セリフ等の抜き出し）や同じ内容の言い換えの繰り返しは一切禁止します。
+2. ネタバレは一切書かないでください。
+3. 英語の思考メモは含めず、上記の3行の日本語のみを出力してください。`;
 
             const parts = [{ text: promptText }, ...imageParts];
             const rawResult = await callGeminiVision(parts);

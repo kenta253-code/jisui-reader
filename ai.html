@@ -459,7 +459,7 @@
 
             <select id="modeSelect">
                 <option value="rtl">右開き (縦書き小説)</option>
-                <option value="ltr">左開き (横書籍)</option>
+                <option value="ltr">左開き (横書き書籍)</option>
             </select>
 
             <select id="readerThemeSelect">
@@ -1150,7 +1150,7 @@
         return imageParts;
     }
 
-    // 日本語エピソードブロックのみを重複・英語見出しなしで安全に抽出するパーサー
+    // 英語インデックスを排除し、完全な日本語エピソードブロックのみを抽出するパーサー
     function parseAndFormatEpisodes(rawText, headerPrefix) {
         if (!rawText) return "解析結果を取得できませんでした。";
 
@@ -1165,7 +1165,7 @@
             let line = lines[i].trim();
             if (!line) continue;
 
-            if (/^(Constraint|Image|Draft|Context|Characters|Key Plot|Refinement|Title|Content|Length|No spoilers|Final Version|Okay|\*)/i.test(line)) {
+            if (/^(Constraint|Image|Draft|Context|Characters|Key Plot|Refinement|Title|Content|Length|No spoilers|Final Version|Okay|\*|\[|\{|\})/i.test(line)) {
                 continue;
             }
 
@@ -1196,7 +1196,7 @@
 
             if (currentEp) {
                 const jpCount = (line.match(/[\u3040-\u309F\u4E00-\u9FAF]/g) || []).length;
-                if (jpCount >= 4) {
+                if (jpCount >= 4 && !/^\d+[\.\s]/.test(line)) {
                     currentEp.detail.push(line);
                 }
             }
@@ -1216,50 +1216,39 @@
         return headerPrefix + '\n\n' + text;
     }
 
-    // 確実な動的検出とモデルフォールバック通信
+    // 公式推奨 x-goog-api-key ヘッダー方式による安定通信
     async function callGeminiVision(parts) {
-        let candidateModels = [];
+        const models = [
+            'gemini-2.5-flash',
+            'gemini-1.5-flash',
+            'gemini-1.5-pro'
+        ];
 
-        try {
-            const mRes = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models?key=$](https://generativelanguage.googleapis.com/v1beta/models?key=$){GEMINI_API_KEY}`);
-            if (mRes.ok) {
-                const mData = await mRes.json();
-                if (mData && mData.models) {
-                    candidateModels = mData.models.filter(m => 
-                        m.supportedGenerationMethods && 
-                        m.supportedGenerationMethods.includes('generateContent') && 
-                        !m.name.includes('embedding')
-                    );
-                }
-            }
-        } catch (e) {}
-
-        if (candidateModels.length === 0) {
-            candidateModels = [
-                { name: 'models/gemini-1.5-flash' },
-                { name: 'models/gemini-2.0-flash' },
-                { name: 'models/gemini-1.5-pro' }
-            ];
-        }
-
-        for (const model of candidateModels) {
+        let lastErrMsg = '';
+        for (const model of models) {
             try {
-                const endpointName = model.name.startsWith('models/') ? model.name : `models/${model.name}`;
-                const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/$](https://generativelanguage.googleapis.com/v1beta/$){endpointName}:generateContent?key=${GEMINI_API_KEY}`, {
+                const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/$](https://generativelanguage.googleapis.com/v1beta/models/$){model}:generateContent`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-goog-api-key': GEMINI_API_KEY
+                    },
                     body: JSON.stringify({ contents: [{ parts }] })
                 });
+
                 if (res.ok) {
                     const data = await res.json();
                     const result = data.candidates?.[0]?.content?.parts?.[0]?.text;
                     if (result) return result;
+                } else {
+                    const errData = await res.json().catch(() => ({}));
+                    lastErrMsg = errData.error?.message || `HTTP ${res.status}`;
                 }
             } catch(e) {
-                continue;
+                lastErrMsg = e.message || 'ネットワーク接続エラー';
             }
         }
-        throw new Error('Gemini APIでの解析に失敗しました。時間をおいて再試行してください。');
+        throw new Error(`AI解析エラー (${lastErrMsg})`);
     }
 
     // エピソード抽出アクション

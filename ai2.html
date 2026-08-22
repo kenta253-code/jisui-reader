@@ -1114,11 +1114,50 @@
         return imageParts;
     }
 
+    // 英語メモや思考プロセスを除去し、純粋な日本語回答のみを抽出するパーサー
+    function cleanAnswerText(rawText) {
+        if (!rawText) return "回答を取得できませんでした。";
+
+        let text = rawText.replace(/\*\*/g, '').replace(/```[a-z]*/gi, '').trim();
+        const lines = text.split('\n');
+        const validLines = [];
+
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) {
+                if (validLines.length > 0 && validLines[validLines.length - 1] !== '') {
+                    validLines.push('');
+                }
+                continue;
+            }
+
+            // 英語メタ行・思考メモ・確認チェック行を除外
+            if (/^(Novel Reading|Assistant|The Town|Image \d|Title Page|P\.\s*\d+|Please summarize|Output|English|No spoilers|Constraint|Draft|Context|Characters|Key Plot|Refinement|Title|Content|Length|Final Version|Okay|\*|Do not|Yes\.|No\.)/i.test(trimmed)) {
+                continue;
+            }
+            if (/^\d+\.\s*(Do\s|Output\s|No\s|Please\s)/i.test(trimmed)) {
+                continue;
+            }
+            if (/^[A-Za-z0-9\s"'\.,\-_–—:;?\(\)]+$/.test(trimmed)) {
+                continue; // 英語のみの行は除外
+            }
+
+            // 日本語が一定数以上含まれる実質的な回答行のみを採用
+            const jpCount = (trimmed.match(/[\u3040-\u309F\u4E00-\u9FAF]/g) || []).length;
+            if (jpCount >= 4) {
+                validLines.push(trimmed);
+            }
+        }
+
+        const cleaned = validLines.join('\n').trim();
+        return cleaned || text;
+    }
+
     async function callGeminiVision(parts) {
         let candidateModels = [];
 
         try {
-            const mRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`);
+            const mRes = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models?key=$](https://generativelanguage.googleapis.com/v1beta/models?key=$){GEMINI_API_KEY}`);
             if (mRes.ok) {
                 const mData = await mRes.json();
                 if (mData && mData.models) {
@@ -1142,7 +1181,7 @@
         for (const model of candidateModels) {
             try {
                 const endpointName = model.name.startsWith('models/') ? model.name : `models/${model.name}`;
-                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/${endpointName}:generateContent?key=${GEMINI_API_KEY}`, {
+                const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/$](https://generativelanguage.googleapis.com/v1beta/$){endpointName}:generateContent?key=${GEMINI_API_KEY}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ contents: [{ parts }] })
@@ -1195,12 +1234,12 @@
 
 【厳格な指示】
 1. P.${currentPage}より先の展開（ネタバレ）は絶対に含めないでください。
-2. 英語の思考メモや挨拶は含めず、読者の疑問に答える日本語の回答本文のみを出力してください。`;
+2. 思考プロセス、英語の要約、メタ確認メモは一切書かず、読者の質問に対する【自然な日本語の回答本文のみ】を出力してください。`;
 
             const parts = [{ text: promptText }, ...imageParts];
             const rawResult = await callGeminiVision(parts);
             
-            const resultText = `【回答】\n\n` + rawResult.replace(/\*\*/g, '').trim();
+            const resultText = `【回答】\n\n` + cleanAnswerText(rawResult);
             aiQueryResult.textContent = resultText;
             showToast('回答を生成しました');
         } catch (err) {

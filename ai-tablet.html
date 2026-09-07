@@ -267,7 +267,6 @@
         .toolbar::-webkit-scrollbar { height: 3px; }
         .toolbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 3px; }
 
-        /* 没入（全画面）モード時のツールバー退避 */
         body.immersive-mode .toolbar {
             position: absolute;
             top: 0; left: 0; right: 0;
@@ -276,7 +275,6 @@
             pointer-events: none;
         }
         
-        /* 没入モード時のフローティング解除ボタン */
         #btnExitImmersive {
             display: none;
             position: absolute;
@@ -317,7 +315,6 @@
             touch-action: pan-y;
         }
         
-        /* スライドめくりアニメーション */
         #spread {
             display: flex;
             align-items: center;
@@ -327,13 +324,7 @@
             position: relative;
             max-width: 100%;
             max-height: 100%;
-            transition: transform 0.22s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.22s ease;
         }
-
-        .slide-left-out { transform: translateX(-30px); opacity: 0; }
-        .slide-right-out { transform: translateX(30px); opacity: 0; }
-        .slide-left-in { transform: translateX(30px); opacity: 0; }
-        .slide-right-in { transform: translateX(-30px); opacity: 0; }
 
         canvas { display: block; background-color: #fff; }
         .click-zone { position: absolute; top: 0; bottom: 0; width: 45%; cursor: pointer; z-index: 5; }
@@ -726,7 +717,6 @@
     let pdfDoc = null;
     let pageNum = 1;
     let mode = 'rtl';
-    let isAnimating = false;
 
     function isPortraitMode() {
         const container = document.getElementById('viewer-container');
@@ -1516,21 +1506,14 @@
         return canvas;
     }
 
-    async function renderSpread(direction = null) {
+    async function renderSpread() {
         if (!pdfDoc) return;
+        spread.innerHTML = '';
 
         const container = document.getElementById('viewer-container');
         const containerWidth = container.clientWidth;
         const containerHeight = container.clientHeight;
         const portrait = isPortraitMode();
-
-        // アニメーション用のスライドアウト
-        if (direction) {
-            spread.className = direction === 'next' ? 'slide-left-out' : 'slide-right-out';
-            await new Promise(r => setTimeout(r, 120));
-        }
-
-        spread.innerHTML = '';
 
         if (portrait) {
             pageInfo.textContent = `${pageNum} / ${pdfDoc.numPages}`;
@@ -1563,20 +1546,6 @@
             }
         }
 
-        // アニメーション用のスライドイン
-        if (direction) {
-            spread.className = direction === 'next' ? 'slide-left-in' : 'slide-right-in';
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    spread.className = '';
-                    setTimeout(() => { isAnimating = false; }, 200);
-                });
-            });
-        } else {
-            spread.className = '';
-            isAnimating = false;
-        }
-
         if (currentBook) {
             currentBook.currentPage = pageNum;
             currentBook.lastReadAt = Date.now();
@@ -1587,48 +1556,40 @@
     }
 
     function nextPage() {
-        if (!pdfDoc || isAnimating) return;
+        if (!pdfDoc) return;
         if (isPortraitMode()) {
             if (pageNum < pdfDoc.numPages) {
-                isAnimating = true;
                 pageNum += 1;
-                renderSpread('next');
+                renderSpread();
             }
         } else {
             if (pageNum === 1) {
-                if (pdfDoc.numPages >= 2) {
-                    isAnimating = true;
-                    pageNum = 2;
-                    renderSpread('next');
-                }
+                if (pdfDoc.numPages >= 2) pageNum = 2;
             } else {
-                if (pageNum + 2 <= pdfDoc.numPages || pageNum + 1 <= pdfDoc.numPages) {
-                    isAnimating = true;
+                if (pageNum + 2 <= pdfDoc.numPages) {
                     pageNum += 2;
-                    renderSpread('next');
+                } else if (pageNum + 1 <= pdfDoc.numPages) {
+                    pageNum += 2;
                 }
             }
+            renderSpread();
         }
     }
 
     function prevPage() {
-        if (!pdfDoc || isAnimating) return;
+        if (!pdfDoc) return;
         if (isPortraitMode()) {
             if (pageNum > 1) {
-                isAnimating = true;
                 pageNum -= 1;
-                renderSpread('prev');
+                renderSpread();
             }
         } else {
             if (pageNum === 2) {
-                isAnimating = true;
                 pageNum = 1;
-                renderSpread('prev');
             } else if (pageNum > 2) {
-                isAnimating = true;
                 pageNum -= 2;
-                renderSpread('prev');
             }
+            renderSpread();
         }
     }
 
@@ -1645,7 +1606,7 @@
         else nextPage();
     });
 
-    // 【指でのスワイプめくり操作の実装】
+    // 指でのスワイプ操作（パッと瞬時にページ送り）
     let touchStartX = 0;
     let touchStartY = 0;
     let touchEndX = 0;
@@ -1669,28 +1630,23 @@
     function handleSwipeGesture() {
         const deltaX = touchEndX - touchStartX;
         const deltaY = touchEndY - touchStartY;
-        const threshold = 40; // スワイプ検知しきい値
+        const threshold = 40;
 
-        // 縦スクロール誤認を防止（横移動が縦移動より大きい場合のみ反応）
         if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > threshold) {
             if (deltaX < 0) {
-                // 左へスワイプ
                 if (mode === 'rtl') nextPage();
                 else prevPage();
             } else {
-                // 右へスワイプ
                 if (mode === 'rtl') prevPage();
                 else nextPage();
             }
         }
     }
 
-    // 【iPad対応フルスクリーン・没入トグル】
     function toggleFullscreen() {
         const isImmersive = document.body.classList.contains('immersive-mode');
 
         if (!isImmersive) {
-            // フルスクリーン/没入モードへ
             document.body.classList.add('immersive-mode');
             btnFullscreen.textContent = '✖ 戻す';
             if (document.documentElement.requestFullscreen) {
@@ -1699,7 +1655,6 @@
                 document.documentElement.webkitRequestFullscreen();
             }
         } else {
-            // 解除
             document.body.classList.remove('immersive-mode');
             btnFullscreen.textContent = '⛶ 全画面';
             if (document.exitFullscreen) {

@@ -2,7 +2,9 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>自炊本リーダー [タブレットAI版]</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📱</text></svg>">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -246,7 +248,6 @@
 
         #reader-view { flex: 1; display: none; flex-direction: column; height: 100vh; overflow: hidden; position: relative; }
         
-        /* ツールバー：スワイプ可能な横スクロール＋コンパクト配置 */
         .toolbar {
             height: 52px;
             background-color: var(--bg-toolbar);
@@ -261,18 +262,41 @@
             overflow-y: hidden;
             white-space: nowrap;
             -webkit-overflow-scrolling: touch;
+            transition: transform 0.25s ease, opacity 0.25s ease;
         }
         .toolbar::-webkit-scrollbar { height: 3px; }
         .toolbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 3px; }
 
-        body.fullscreen-mode .toolbar { position: absolute; top: 0; left: 0; right: 0; opacity: 0; transform: translateY(-100%); transition: all 0.25s ease; }
-        body.fullscreen-mode .toolbar:hover, body.fullscreen-mode .toolbar:focus-within { opacity: 1; transform: translateY(0); }
+        /* 没入（全画面）モード時のツールバー退避 */
+        body.immersive-mode .toolbar {
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            transform: translateY(-100%);
+            opacity: 0;
+            pointer-events: none;
+        }
         
+        /* 没入モード時のフローティング解除ボタン */
+        #btnExitImmersive {
+            display: none;
+            position: absolute;
+            top: 10px; right: 12px;
+            background: rgba(0,0,0,0.6);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: #fff;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            z-index: 100;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+        }
+        body.immersive-mode #btnExitImmersive { display: inline-flex; }
+
         .toolbar-group { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
         #readerBookTitle { font-size: 13px; font-weight: 600; max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         #pageInfo { font-size: 13px; min-width: 75px; text-align: center; font-weight: 600; flex-shrink: 0; }
 
-        /* iPad miniなどの狭い画面向けの自動スリム化 */
         @media (max-width: 900px) {
             .btn { padding: 6px 9px; font-size: 12.5px; min-height: 34px; gap: 4px; }
             select { padding: 6px 8px; font-size: 12.5px; min-height: 34px; }
@@ -281,8 +305,36 @@
             .toolbar { gap: 4px; padding: 0 6px; height: 48px; }
         }
 
-        #viewer-container { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; background-color: var(--bg-main); overflow: hidden; padding: 6px; }
-        #spread { display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 30px rgba(0,0,0,0.4); background-color: #fff; position: relative; max-width: 100%; max-height: 100%; }
+        #viewer-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            background-color: var(--bg-main);
+            overflow: hidden;
+            padding: 4px;
+            touch-action: pan-y;
+        }
+        
+        /* スライドめくりアニメーション */
+        #spread {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+            background-color: #fff;
+            position: relative;
+            max-width: 100%;
+            max-height: 100%;
+            transition: transform 0.22s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.22s ease;
+        }
+
+        .slide-left-out { transform: translateX(-30px); opacity: 0; }
+        .slide-right-out { transform: translateX(30px); opacity: 0; }
+        .slide-left-in { transform: translateX(30px); opacity: 0; }
+        .slide-right-in { transform: translateX(-30px); opacity: 0; }
+
         canvas { display: block; background-color: #fff; }
         .click-zone { position: absolute; top: 0; bottom: 0; width: 45%; cursor: pointer; z-index: 5; }
         #left-zone { left: 0; }
@@ -462,6 +514,8 @@
 </div>
 
 <div id="reader-view">
+    <button id="btnExitImmersive" onclick="toggleFullscreen()">✕ メニュー表示</button>
+
     <div class="toolbar" id="toolbar">
         <div class="toolbar-group">
             <button class="btn" id="btnBackToShelf">📚 本棚</button>
@@ -646,6 +700,7 @@
     const spread = document.getElementById('spread');
     const leftZone = document.getElementById('left-zone');
     const rightZone = document.getElementById('right-zone');
+    const viewerContainer = document.getElementById('viewer-container');
 
     const btnToggleBookmark = document.getElementById('btnToggleBookmark');
     const btnListBookmarks = document.getElementById('btnListBookmarks');
@@ -671,6 +726,7 @@
     let pdfDoc = null;
     let pageNum = 1;
     let mode = 'rtl';
+    let isAnimating = false;
 
     function isPortraitMode() {
         const container = document.getElementById('viewer-container');
@@ -695,7 +751,7 @@
     function showToast(msg) {
         toast.textContent = msg;
         toast.classList.add('show');
-        setTimeout(() => toast.classList.remove('show'), 3000);
+        setTimeout(() => toast.classList.remove('show'), 2500);
     }
 
     function resetAIPanel() {
@@ -961,6 +1017,7 @@
     }
 
     btnBackToShelf.addEventListener('click', async () => {
+        document.body.classList.remove('immersive-mode');
         if (document.fullscreenElement) {
             document.exitFullscreen().catch(()=>{});
         }
@@ -1459,14 +1516,21 @@
         return canvas;
     }
 
-    async function renderSpread() {
+    async function renderSpread(direction = null) {
         if (!pdfDoc) return;
-        spread.innerHTML = '';
 
         const container = document.getElementById('viewer-container');
         const containerWidth = container.clientWidth;
         const containerHeight = container.clientHeight;
         const portrait = isPortraitMode();
+
+        // アニメーション用のスライドアウト
+        if (direction) {
+            spread.className = direction === 'next' ? 'slide-left-out' : 'slide-right-out';
+            await new Promise(r => setTimeout(r, 120));
+        }
+
+        spread.innerHTML = '';
 
         if (portrait) {
             pageInfo.textContent = `${pageNum} / ${pdfDoc.numPages}`;
@@ -1499,6 +1563,20 @@
             }
         }
 
+        // アニメーション用のスライドイン
+        if (direction) {
+            spread.className = direction === 'next' ? 'slide-left-in' : 'slide-right-in';
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    spread.className = '';
+                    setTimeout(() => { isAnimating = false; }, 200);
+                });
+            });
+        } else {
+            spread.className = '';
+            isAnimating = false;
+        }
+
         if (currentBook) {
             currentBook.currentPage = pageNum;
             currentBook.lastReadAt = Date.now();
@@ -1509,40 +1587,48 @@
     }
 
     function nextPage() {
-        if (!pdfDoc) return;
+        if (!pdfDoc || isAnimating) return;
         if (isPortraitMode()) {
             if (pageNum < pdfDoc.numPages) {
+                isAnimating = true;
                 pageNum += 1;
-                renderSpread();
+                renderSpread('next');
             }
         } else {
             if (pageNum === 1) {
-                if (pdfDoc.numPages >= 2) pageNum = 2;
+                if (pdfDoc.numPages >= 2) {
+                    isAnimating = true;
+                    pageNum = 2;
+                    renderSpread('next');
+                }
             } else {
-                if (pageNum + 2 <= pdfDoc.numPages) {
+                if (pageNum + 2 <= pdfDoc.numPages || pageNum + 1 <= pdfDoc.numPages) {
+                    isAnimating = true;
                     pageNum += 2;
-                } else if (pageNum + 1 <= pdfDoc.numPages) {
-                    pageNum += 2;
+                    renderSpread('next');
                 }
             }
-            renderSpread();
         }
     }
 
     function prevPage() {
-        if (!pdfDoc) return;
+        if (!pdfDoc || isAnimating) return;
         if (isPortraitMode()) {
             if (pageNum > 1) {
+                isAnimating = true;
                 pageNum -= 1;
-                renderSpread();
+                renderSpread('prev');
             }
         } else {
             if (pageNum === 2) {
+                isAnimating = true;
                 pageNum = 1;
+                renderSpread('prev');
             } else if (pageNum > 2) {
+                isAnimating = true;
                 pageNum -= 2;
+                renderSpread('prev');
             }
-            renderSpread();
         }
     }
 
@@ -1559,27 +1645,82 @@
         else nextPage();
     });
 
-    function toggleFullscreen() {
-        if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen().catch(err => {});
-        } else {
-            if (document.exitFullscreen) document.exitFullscreen();
+    // 【指でのスワイプめくり操作の実装】
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchEndX = 0;
+    let touchEndY = 0;
+
+    viewerContainer.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+            touchStartX = e.touches[0].screenX;
+            touchStartY = e.touches[0].screenY;
         }
+    }, { passive: true });
+
+    viewerContainer.addEventListener('touchend', (e) => {
+        if (e.changedTouches.length === 1) {
+            touchEndX = e.changedTouches[0].screenX;
+            touchEndY = e.changedTouches[0].screenY;
+            handleSwipeGesture();
+        }
+    }, { passive: true });
+
+    function handleSwipeGesture() {
+        const deltaX = touchEndX - touchStartX;
+        const deltaY = touchEndY - touchStartY;
+        const threshold = 40; // スワイプ検知しきい値
+
+        // 縦スクロール誤認を防止（横移動が縦移動より大きい場合のみ反応）
+        if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > threshold) {
+            if (deltaX < 0) {
+                // 左へスワイプ
+                if (mode === 'rtl') nextPage();
+                else prevPage();
+            } else {
+                // 右へスワイプ
+                if (mode === 'rtl') prevPage();
+                else nextPage();
+            }
+        }
+    }
+
+    // 【iPad対応フルスクリーン・没入トグル】
+    function toggleFullscreen() {
+        const isImmersive = document.body.classList.contains('immersive-mode');
+
+        if (!isImmersive) {
+            // フルスクリーン/没入モードへ
+            document.body.classList.add('immersive-mode');
+            btnFullscreen.textContent = '✖ 戻す';
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().catch(() => {});
+            } else if (document.documentElement.webkitRequestFullscreen) {
+                document.documentElement.webkitRequestFullscreen();
+            }
+        } else {
+            // 解除
+            document.body.classList.remove('immersive-mode');
+            btnFullscreen.textContent = '⛶ 全画面';
+            if (document.exitFullscreen) {
+                document.exitFullscreen().catch(() => {});
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            }
+        }
+        setTimeout(() => {
+            if (pdfDoc) renderSpread();
+        }, 150);
     }
 
     btnFullscreen.addEventListener('click', toggleFullscreen);
 
     document.addEventListener('fullscreenchange', () => {
-        if (document.fullscreenElement) {
-            document.body.classList.add('fullscreen-mode');
-            btnFullscreen.textContent = '✖';
-        } else {
-            document.body.classList.remove('fullscreen-mode');
+        if (!document.fullscreenElement) {
+            document.body.classList.remove('immersive-mode');
             btnFullscreen.textContent = '⛶ 全画面';
         }
-        setTimeout(() => {
-            if (pdfDoc) renderSpread();
-        }, 100);
+        setTimeout(() => { if (pdfDoc) renderSpread(); }, 100);
     });
 
     window.addEventListener('resize', () => {
@@ -1593,7 +1734,7 @@
             if (pdfDoc && readerView.style.display === 'flex') {
                 renderSpread();
             }
-        }, 200);
+        }, 250);
     });
 
     openDB().then(() => {

@@ -159,7 +159,7 @@
         .btn-danger { background-color: transparent; color: #ff5c5c; border: 1px solid rgba(255, 92, 92, 0.4); padding: 4px 8px; font-size: 12px; border-radius: 6px; }
         .btn-danger:hover, .btn-danger:active { background-color: #ff5c5c; color: white; }
 
-        select, input[type="text"] {
+        select, input[type="text"], input[type="password"] {
             background-color: var(--btn-bg);
             color: var(--text-color);
             border: 1px solid var(--border-color);
@@ -180,7 +180,6 @@
             transition: background 0.2s ease;
         }
 
-        /* 本棚ヘッダー：ステータスバー分の余白を自動付加 */
         .shelf-header {
             height: calc(60px + env(safe-area-inset-top, 0px));
             padding-top: env(safe-area-inset-top, 0px);
@@ -261,7 +260,6 @@
 
         #reader-view { flex: 1; display: none; flex-direction: column; height: 100vh; overflow: hidden; position: relative; }
         
-        /* 読書ツールバー：ステータスバー分の余白を自動付加 */
         .toolbar {
             height: calc(52px + env(safe-area-inset-top, 0px));
             padding-top: env(safe-area-inset-top, 0px);
@@ -493,6 +491,9 @@
             <button class="btn btn-primary" onclick="document.getElementById('shelfFileInput').click()">
                 ＋ 本を追加
             </button>
+            <button class="btn" onclick="openApiKeyModal()">
+                🔑 APIキー
+            </button>
             <select id="shelfThemeSelect">
                 <option value="wood">🟤 ウッド</option>
                 <option value="dark">🌙 ダーク</option>
@@ -528,6 +529,26 @@
         <div class="modal-actions" style="display:flex; justify-content:flex-end; gap:8px;">
             <button class="btn" onclick="closeAssignModal()">キャンセル</button>
             <button class="btn btn-primary" onclick="saveAssignCollections()">保存</button>
+        </div>
+    </div>
+</div>
+
+<!-- APIキー設定モーダル（端末内ローカル保存） -->
+<div class="modal-overlay" id="apiKeyModal">
+    <div class="modal-card">
+        <div class="modal-title">
+            <span>🔑 Gemini APIキーの設定</span>
+            <button class="card-action-btn" onclick="closeApiKeyModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div style="font-size: 12.5px; color: var(--text-sub); line-height: 1.5;">
+                入力されたAPIキーは<strong>この端末（iPad）内のみに安全に保存</strong>されます。GitHubなどの外部サーバーへ送信されることはありません。
+            </div>
+            <input type="password" id="apiKeyInput" placeholder="AQ.Ab8... または AIzaSy..." style="width: 100%;">
+            <div style="display:flex; gap: 8px;">
+                <button class="btn btn-danger" onclick="clearApiKeyAction()" style="flex:1;">キーを削除</button>
+                <button class="btn btn-primary" onclick="saveApiKeyAction()" style="flex:2; justify-content:center;">保存する</button>
+            </div>
         </div>
     </div>
 </div>
@@ -583,7 +604,10 @@
         <div id="aiDrawer" class="side-drawer">
             <div class="drawer-header">
                 <span>🤖 AI 読書アシスタント</span>
-                <button class="card-action-btn" id="btnCloseAIDrawer">✕</button>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <button class="btn" style="padding:4px 8px; font-size:11px; min-height:28px;" onclick="openApiKeyModal()">🔑 キー設定</button>
+                    <button class="card-action-btn" id="btnCloseAIDrawer">✕</button>
+                </div>
             </div>
             <div class="drawer-content">
                 <div class="ai-section-box">
@@ -620,7 +644,50 @@
 <script>
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-    const GEMINI_API_KEY = 'AQ.Ab8RN6JP-oM5a54UjwIpM8lLKu5v0gMk5XUePUMukE4wOZQxYw';
+    // 端末（localStorage）からのみAPIキーを取得する（コード内には空欄のまま保持）
+    function getStoredApiKey() {
+        return (localStorage.getItem('jisui_gemini_api_key') || '').trim();
+    }
+
+    function setStoredApiKey(key) {
+        localStorage.setItem('jisui_gemini_api_key', key.trim());
+    }
+
+    function clearStoredApiKey() {
+        localStorage.removeItem('jisui_gemini_api_key');
+    }
+
+    const apiKeyModal = document.getElementById('apiKeyModal');
+    const apiKeyInput = document.getElementById('apiKeyInput');
+
+    window.openApiKeyModal = function() {
+        apiKeyInput.value = getStoredApiKey();
+        apiKeyModal.classList.add('open');
+    };
+
+    window.closeApiKeyModal = function() {
+        apiKeyModal.classList.remove('open');
+    };
+
+    window.saveApiKeyAction = function() {
+        const val = apiKeyInput.value.trim();
+        if (!val) {
+            alert('APIキーを入力してください。');
+            return;
+        }
+        setStoredApiKey(val);
+        closeApiKeyModal();
+        showToast('APIキーをこの端末に保存しました');
+    };
+
+    window.clearApiKeyAction = function() {
+        if (confirm('保存されているAPIキーを削除しますか？')) {
+            clearStoredApiKey();
+            apiKeyInput.value = '';
+            closeApiKeyModal();
+            showToast('APIキーを削除しました');
+        }
+    };
 
     const DB_NAME = 'JisuiBookShelfDB';
     const DB_VERSION = 1;
@@ -1352,10 +1419,16 @@
     }
 
     async function callGeminiVision(parts) {
+        const apiKey = getStoredApiKey();
+        if (!apiKey) {
+            openApiKeyModal();
+            throw new Error('Gemini APIキーが設定されていません。キーを入力してください。');
+        }
+
         let candidateModels = [];
 
         try {
-            const mRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`);
+            const mRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
             if (mRes.ok) {
                 const mData = await mRes.json();
                 if (mData && mData.models) {
@@ -1379,7 +1452,7 @@
         for (const model of candidateModels) {
             try {
                 const endpointName = model.name.startsWith('models/') ? model.name : `models/${model.name}`;
-                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/${endpointName}:generateContent?key=${GEMINI_API_KEY}`, {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/${endpointName}:generateContent?key=${apiKey}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ contents: [{ parts }] })
@@ -1393,11 +1466,17 @@
                 continue;
             }
         }
-        throw new Error('Gemini APIでの通信に失敗しました。時間をおいて再試行してください。');
+        throw new Error('Gemini APIでの通信に失敗しました。キーが有効かご確認ください。');
     }
 
     window.generateSummaryAction = async function() {
         if (!pdfDoc || !currentBook) return;
+
+        const apiKey = getStoredApiKey();
+        if (!apiKey) {
+            openApiKeyModal();
+            return;
+        }
 
         const currentPage = pageNum;
         let startPage = 1;
@@ -1448,6 +1527,12 @@
     };
 
     window.queryCharacterAction = async function() {
+        const apiKey = getStoredApiKey();
+        if (!apiKey) {
+            openApiKeyModal();
+            return;
+        }
+
         const charName = aiCharacterInput.value.trim();
         if (!charName) {
             alert('人物名を入力してください。');
